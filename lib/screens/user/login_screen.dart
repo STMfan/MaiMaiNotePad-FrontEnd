@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/user_provider.dart';
-import '../constants/app_constants.dart';
-import '../widgets/custom_text_field.dart';
+import '../../providers/user_provider.dart';
+import '../../constants/app_constants.dart';
+import '../../widgets/custom_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

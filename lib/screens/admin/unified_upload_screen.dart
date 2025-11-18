@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
-import '../providers/user_provider.dart';
-import '../services/api_service.dart';
-import '../constants/app_constants.dart';
-import '../widgets/custom_text_field.dart';
+import '../../providers/user_provider.dart';
+import '../../services/api_service.dart';
+import '../../constants/app_constants.dart';
+import '../../widgets/custom_text_field.dart';
 
 enum UploadType { knowledge, persona }
 

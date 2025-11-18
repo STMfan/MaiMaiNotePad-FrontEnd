@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
-import '../models/knowledge.dart';
-import '../models/persona.dart';
+import '../../services/api_service.dart';
+import '../../models/knowledge.dart';
+import '../../models/persona.dart';
 
 class ReviewTabContent extends StatefulWidget {
   const ReviewTabContent({super.key});

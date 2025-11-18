@@ -2,22 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/knowledge.dart';
-import '../providers/user_provider.dart';
-import '../services/api_service.dart';
-import '../utils/app_theme.dart';
+import '../../models/persona.dart';
+import '../../providers/user_provider.dart';
+import '../../services/api_service.dart';
+import '../../utils/app_theme.dart';
 
-class KnowledgeDetailScreen extends StatefulWidget {
-  final String knowledgeId;
+class PersonaDetailScreen extends StatefulWidget {
+  final String personaId;
 
-  const KnowledgeDetailScreen({super.key, required this.knowledgeId});
+  const PersonaDetailScreen({super.key, required this.personaId});
 
   @override
-  _KnowledgeDetailScreenState createState() => _KnowledgeDetailScreenState();
+  _PersonaDetailScreenState createState() => _PersonaDetailScreenState();
 }
 
-class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
-  Knowledge? _knowledge;
+class _PersonaDetailScreenState extends State<PersonaDetailScreen> {
+  Persona? _persona;
   bool _isLoading = true;
   bool _isStarring = false;
   String? _errorMessage;
@@ -26,10 +26,10 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadKnowledgeDetail();
+    _loadPersonaDetail();
   }
 
-  Future<void> _loadKnowledgeDetail() async {
+  Future<void> _loadPersonaDetail() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -39,30 +39,30 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final apiService = ApiService();
 
-      final knowledge = await apiService.getKnowledgeDetail(
-        widget.knowledgeId,
+      final persona = await apiService.getPersonaDetail(
+        widget.personaId,
         userProvider.token,
       );
-      final isStarred = await apiService.isKnowledgeStarred(
-        widget.knowledgeId,
+      final isStarred = await apiService.isPersonaStarred(
+        widget.personaId,
         userProvider.token,
       );
 
       setState(() {
-        _knowledge = knowledge;
+        _persona = persona;
         _isStarred = isStarred;
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = '加载知识库详情失败: $e';
+        _errorMessage = '加载人设卡详情失败: $e';
         _isLoading = false;
       });
     }
   }
 
   Future<void> _toggleStar() async {
-    if (_knowledge == null || _isStarring) return;
+    if (_persona == null || _isStarring) return;
 
     setState(() {
       _isStarring = true;
@@ -73,57 +73,58 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
       final apiService = ApiService();
 
       if (_isStarred) {
-        await apiService.unstarKnowledge(
-          widget.knowledgeId,
-          userProvider.token,
-        );
+        await apiService.unstarPersona(widget.personaId, userProvider.token);
         setState(() {
           _isStarred = false;
-          if (_knowledge != null) {
-            _knowledge = Knowledge(
-              id: _knowledge!.id,
-              name: _knowledge!.title,
-              description: _knowledge!.description,
-              uploaderId: _knowledge!.authorId,
-              copyrightOwner: null,
-              starCount: _knowledge!.stars - 1,
-              isPublic: _knowledge!.isPublic,
-              fileNames: const [],
-              createdAt: _knowledge!.createdAt,
-              updatedAt: _knowledge!.updatedAt,
-              content: _knowledge!.content,
-              tags: _knowledge!.tags,
-              downloads: _knowledge!.downloads,
-              downloadUrl: _knowledge!.downloadUrl,
-              previewUrl: _knowledge!.previewUrl,
-              version: _knowledge!.version,
-              size: _knowledge!.size,
+          if (_persona != null) {
+            _persona = Persona(
+              id: _persona!.id,
+              name: _persona!.name,
+              description: _persona!.description,
+              content: _persona!.content,
+              uploaderId: _persona!.uploaderId,
+              author: _persona!.author,
+              authorId: _persona!.authorId,
+              tags: _persona!.tags,
+              createdAt: _persona!.createdAt,
+              updatedAt: _persona!.updatedAt,
+              stars: _persona!.stars - 1,
+              starCount: _persona!.starCount - 1,
+              isPublic: _persona!.isPublic,
+              fileNames: _persona!.fileNames,
+              downloadUrl: _persona!.downloadUrl,
+              previewUrl: _persona!.previewUrl,
+              version: _persona!.version,
+              size: _persona!.size,
+              downloads: _persona!.downloads,
             );
           }
         });
       } else {
-        await apiService.starKnowledge(widget.knowledgeId, userProvider.token);
+        await apiService.starPersona(widget.personaId, userProvider.token);
         setState(() {
           _isStarred = true;
-          if (_knowledge != null) {
-            _knowledge = Knowledge(
-              id: _knowledge!.id,
-              name: _knowledge!.title,
-              description: _knowledge!.description,
-              uploaderId: _knowledge!.authorId,
-              copyrightOwner: null,
-              starCount: _knowledge!.stars + 1,
-              isPublic: _knowledge!.isPublic,
-              fileNames: const [],
-              createdAt: _knowledge!.createdAt,
-              updatedAt: _knowledge!.updatedAt,
-              content: _knowledge!.content,
-              tags: _knowledge!.tags,
-              downloads: _knowledge!.downloads,
-              downloadUrl: _knowledge!.downloadUrl,
-              previewUrl: _knowledge!.previewUrl,
-              version: _knowledge!.version,
-              size: _knowledge!.size,
+          if (_persona != null) {
+            _persona = Persona(
+              id: _persona!.id,
+              name: _persona!.name,
+              description: _persona!.description,
+              content: _persona!.content,
+              uploaderId: _persona!.uploaderId,
+              author: _persona!.author,
+              authorId: _persona!.authorId,
+              tags: _persona!.tags,
+              createdAt: _persona!.createdAt,
+              updatedAt: _persona!.updatedAt,
+              stars: _persona!.stars + 1,
+              starCount: _persona!.starCount + 1,
+              isPublic: _persona!.isPublic,
+              fileNames: _persona!.fileNames,
+              downloadUrl: _persona!.downloadUrl,
+              previewUrl: _persona!.previewUrl,
+              version: _persona!.version,
+              size: _persona!.size,
+              downloads: _persona!.downloads,
             );
           }
         });
@@ -140,9 +141,9 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
   }
 
   Future<void> _launchDownloadUrl() async {
-    if (_knowledge?.downloadUrl == null) return;
+    if (_persona?.downloadUrl == null) return;
 
-    final url = Uri.parse(_knowledge!.downloadUrl!);
+    final url = Uri.parse(_persona!.downloadUrl!);
     if (await canLaunchUrl(url)) {
       await launchUrl(url);
     } else {
@@ -156,11 +157,11 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('知识库详情'),
+        title: const Text('人设卡详情'),
         backgroundColor: AppTheme.primaryOrange,
         foregroundColor: Colors.white,
         actions: [
-          if (_knowledge != null)
+          if (_persona != null)
             IconButton(
               icon: _isStarring
                   ? const SizedBox(
@@ -190,22 +191,22 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _loadKnowledgeDetail,
+                    onPressed: _loadPersonaDetail,
                     child: const Text('重试'),
                   ),
                 ],
               ),
             )
-          : _knowledge == null
-          ? const Center(child: Text('知识库不存在'))
+          : _persona == null
+          ? const Center(child: Text('人设卡不存在'))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 标题和作者信息
+                  // 名称和作者信息
                   Text(
-                    _knowledge!.title,
+                    _persona!.name,
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -216,7 +217,7 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
                     children: [
                       const Icon(Icons.person, size: 16),
                       const SizedBox(width: 4),
-                      Text('作者: ${_knowledge!.author}'),
+                      Text('作者: ${_persona!.author}'),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -225,20 +226,20 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
                       const Icon(Icons.schedule, size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        '更新时间: ${_formatDate(_knowledge!.updatedAt ?? DateTime.now())}',
+                        '更新时间: ${_formatDate(_persona!.updatedAt ?? _persona!.createdAt)}',
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
 
                   // 预览图片
-                  if (_knowledge!.previewUrl != null) ...[
+                  if (_persona!.previewUrl != null) ...[
                     Container(
                       width: double.infinity,
                       height: 200,
                       margin: const EdgeInsets.only(bottom: 16),
                       child: CachedNetworkImage(
-                        imageUrl: _knowledge!.previewUrl!,
+                        imageUrl: _persona!.previewUrl!,
                         fit: BoxFit.contain,
                         placeholder: (context, url) =>
                             const Center(child: CircularProgressIndicator()),
@@ -254,11 +255,11 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  Text(_knowledge!.description),
+                  Text(_persona!.description),
                   const SizedBox(height: 16),
 
                   // 标签
-                  if (_knowledge!.tags.isNotEmpty) ...[
+                  if (_persona!.tags.isNotEmpty) ...[
                     const Text(
                       '标签',
                       style: TextStyle(
@@ -270,7 +271,7 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: _knowledge!.tags.map((tag) {
+                      children: _persona!.tags.map((tag) {
                         return Chip(
                           label: Text(tag),
                           backgroundColor: AppTheme.lightOrange,
@@ -285,32 +286,32 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
                     children: [
                       Icon(Icons.star, color: Colors.amber[500], size: 20),
                       const SizedBox(width: 4),
-                      Text('${_knowledge!.stars} 收藏'),
+                      Text('${_persona!.stars} 收藏'),
                       const SizedBox(width: 16),
                       const Icon(Icons.download, size: 20),
                       const SizedBox(width: 4),
-                      Text('${_knowledge!.downloads} 下载'),
+                      Text('${_persona!.downloads} 下载'),
                     ],
                   ),
 
-                  if (_knowledge!.version != null) ...[
+                  if (_persona!.version != null) ...[
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         const Icon(Icons.info_outline, size: 20),
                         const SizedBox(width: 4),
-                        Text('版本: ${_knowledge!.version}'),
+                        Text('版本: ${_persona!.version}'),
                       ],
                     ),
                   ],
 
-                  if (_knowledge!.size != null) ...[
+                  if (_persona!.size != null) ...[
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         const Icon(Icons.storage, size: 20),
                         const SizedBox(width: 4),
-                        Text('大小: ${_formatFileSize(_knowledge!.size!)}'),
+                        Text('大小: ${_formatFileSize(_persona!.size!)}'),
                       ],
                     ),
                   ],
@@ -318,7 +319,7 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
                   const SizedBox(height: 24),
 
                   // 下载按钮
-                  if (_knowledge!.downloadUrl != null) ...[
+                  if (_persona!.downloadUrl != null) ...[
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(

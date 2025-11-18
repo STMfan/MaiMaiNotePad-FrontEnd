@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/user_provider.dart';
-import '../providers/theme_provider.dart';
-import '../utils/app_router.dart';
-import '../services/api_service.dart';
-import '../constants/app_constants.dart';
+import '../../providers/user_provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/app_router.dart';
+import '../../services/api_service.dart';
+import '../../constants/app_constants.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

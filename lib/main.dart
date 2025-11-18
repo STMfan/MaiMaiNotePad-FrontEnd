@@ -5,8 +5,8 @@ import 'providers/user_provider.dart';
 import 'providers/theme_provider.dart';
 import 'utils/app_theme.dart';
 import 'utils/app_router.dart';
-import 'screens/home_screen.dart';
-import 'screens/login_screen.dart';
+import 'screens/home/screens.dart';
+import 'screens/user/screens.dart';
 
 void main() {
   runApp(const MyApp());

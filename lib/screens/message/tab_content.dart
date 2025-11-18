@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/user_provider.dart';
-import '../models/message.dart';
-import '../services/api_service.dart';
-import '../utils/app_router.dart';
+import '../../providers/user_provider.dart';
+import '../../models/message.dart';
+import '../../utils/app_router.dart';
+import '../../services/api_service.dart';
+import '../../utils/app_colors.dart';
 
 // 消息标签页内容组件
 class MessageTabContent extends StatefulWidget {
@@ -166,14 +167,14 @@ class _MessageTabContentState extends State<MessageTabContent> {
             Icon(
               Icons.message_outlined,
               size: isLargeScreen ? 64 : 48,
-              color: Theme.of(context).disabledColor,
+              color: AppColors.disabled(context),
             ),
             SizedBox(height: isLargeScreen ? 16 : 12),
             Text(
               '请先登录查看消息',
               style: TextStyle(
                 fontSize: isLargeScreen ? 18 : 16,
-                color: Theme.of(context).disabledColor,
+                color: AppColors.disabled(context),
               ),
             ),
             SizedBox(height: isLargeScreen ? 24 : 16),
@@ -237,7 +238,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
               _error!,
               style: TextStyle(
                 fontSize: isLargeScreen ? 14 : 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: AppColors.onSurfaceWithOpacity05(context),
               ),
               textAlign: TextAlign.center,
             ),
@@ -269,14 +270,14 @@ class _MessageTabContentState extends State<MessageTabContent> {
             Icon(
               Icons.inbox_outlined,
               size: isLargeScreen ? 64 : 48,
-              color: Theme.of(context).disabledColor,
+              color: AppColors.disabled(context),
             ),
             SizedBox(height: isLargeScreen ? 16 : 12),
             Text(
               '暂无消息',
               style: TextStyle(
                 fontSize: isLargeScreen ? 18 : 16,
-                color: Theme.of(context).disabledColor,
+                color: AppColors.disabled(context),
               ),
             ),
             SizedBox(height: isLargeScreen ? 12 : 8),
@@ -284,7 +285,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
               '您的消息中心是空的',
               style: TextStyle(
                 fontSize: isLargeScreen ? 14 : 12,
-                color: Theme.of(context).disabledColor,
+                color: AppColors.disabled(context),
               ),
             ),
           ],
@@ -339,7 +340,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
                 message.content,
                 style: TextStyle(
                     fontSize: isLargeScreen ? 14 : 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: AppColors.onSurfaceWithOpacity07(context),
                   ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -352,7 +353,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
                     _formatDate(message.createdAt),
                     style: TextStyle(
                       fontSize: isLargeScreen ? 12 : 10,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: AppColors.onSurfaceWithOpacity05(context),
                     ),
                   ),
                   Row(

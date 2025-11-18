@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import '../screens/home_screen.dart';
-import '../screens/login_screen.dart';
-import '../screens/knowledge_screen.dart';
-import '../screens/persona_screen.dart';
-import '../screens/message_screen.dart';
-import '../screens/about_screen.dart';
-import '../screens/stars_screen.dart';
-import '../screens/knowledge_detail_screen.dart';
-import '../screens/persona_detail_screen.dart';
-import '../screens/unified_upload_screen.dart';
+import '../screens/home/screens.dart';
+import '../screens/user/screens.dart';
+import '../screens/knowledge/screens.dart';
+import '../screens/persona/screens.dart';
+import '../screens/message/screens.dart';
+import '../screens/shared/screens.dart';
+import '../screens/admin/unified_upload_screen.dart';
 
 class AppRouter {
   static const String home = '/';

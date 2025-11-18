@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/user_provider.dart';
-import '../models/knowledge.dart';
-import '../utils/app_router.dart';
+import '../../providers/user_provider.dart';
+import '../../utils/app_router.dart';
+import '../../utils/app_colors.dart';
+import '../../models/persona.dart';
 
-// 知识库标签页内容组件
-class KnowledgeTabContent extends StatelessWidget {
-  final List<Knowledge> knowledgeList;
+// 人设卡标签页内容组件
+class PersonaTabContent extends StatelessWidget {
+  final List<Persona> personaList;
   final TextEditingController searchController;
   final Function(String) onSearch;
 
-  const KnowledgeTabContent({
+  const PersonaTabContent({
     super.key,
-    required this.knowledgeList,
+    required this.personaList,
     required this.searchController,
     required this.onSearch,
   });
@@ -44,7 +45,7 @@ class KnowledgeTabContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '知识库管理',
+                        '人设卡管理',
                         style: TextStyle(
                           fontSize: isLargeScreen ? 24 : 20,
                           fontWeight: FontWeight.bold,
@@ -57,7 +58,7 @@ class KnowledgeTabContent extends StatelessWidget {
                             child: TextField(
                               controller: searchController,
                               decoration: InputDecoration(
-                                hintText: '搜索知识库...',
+                                hintText: '搜索人设卡...',
                                 prefixIcon: const Icon(Icons.search),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
@@ -95,53 +96,53 @@ class KnowledgeTabContent extends StatelessWidget {
               ),
               SizedBox(height: isLargeScreen ? 24 : 20),
 
-              // 知识库列表 - 响应式网格
+              // 人设卡列表 - 响应式网格
               Expanded(
                 child: Card(
                   elevation: 2,
                   margin: EdgeInsets.zero,
                   child: Padding(
                     padding: EdgeInsets.all(isLargeScreen ? 24 : 16),
-                    child: knowledgeList.isEmpty
+                    child: personaList.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  Icons.folder_open,
+                                  Icons.person_outline,
                                   size: isLargeScreen ? 64 : 48,
-                                  color: Theme.of(context).disabledColor,
+                                  color: AppColors.disabled(context),
                                 ),
                                 SizedBox(height: isLargeScreen ? 16 : 12),
                                 Text(
-                                  '暂无知识库',
+                                  '暂无人设卡',
                                   style: TextStyle(
                                     fontSize: isLargeScreen ? 18 : 16,
-                                    color: Theme.of(context).disabledColor,
+                                    color: AppColors.disabled(context),
                                   ),
                                 ),
                                 SizedBox(height: isLargeScreen ? 12 : 8),
-                                Text(
-                                  '请登录后上传知识库文件',
-                                  style: TextStyle(
-                                    fontSize: isLargeScreen ? 14 : 12,
-                                    color: Theme.of(context).disabledColor,
+                                if (!userProvider.isLoggedIn)
+                                  Text(
+                                    '请登录后创建人设卡',
+                                    style: TextStyle(
+                                      fontSize: isLargeScreen ? 14 : 12,
+                                      color: AppColors.disabled(context),
+                                    ),
                                   ),
-                                ),
                                 SizedBox(height: isLargeScreen ? 24 : 16),
                                 if (userProvider.isLoggedIn)
                                   ElevatedButton.icon(
                                     onPressed: () {
-                                      // 使用回调函数导航到上传管理
-                                      // 注意：这里需要父组件提供导航回调
                                       Navigator.pushNamed(
                                         context,
-                                        AppRouter.knowledge,
+                                        AppRouter.upload,
+                                        arguments: 'persona',
                                       );
                                     },
-                                    icon: const Icon(Icons.upload_file),
+                                    icon: const Icon(Icons.person_add),
                                     label: Text(
-                                      '上传知识库',
+                                      '创建人设卡',
                                       style: TextStyle(
                                         fontSize: isLargeScreen ? 16 : 14,
                                       ),
@@ -166,12 +167,12 @@ class KnowledgeTabContent extends StatelessWidget {
                                   crossAxisSpacing: isLargeScreen ? 24 : 16,
                                   mainAxisSpacing: isLargeScreen ? 24 : 16,
                                 ),
-                            itemCount: knowledgeList.length,
+                            itemCount: personaList.length,
                             itemBuilder: (context, index) {
-                              final knowledge = knowledgeList[index];
-                              return _buildKnowledgeCard(
+                              final persona = personaList[index];
+                              return _buildPersonaCard(
                                 context,
-                                knowledge,
+                                persona,
                                 isLargeScreen,
                               );
                             },
@@ -186,10 +187,10 @@ class KnowledgeTabContent extends StatelessWidget {
     );
   }
 
-  // 构建知识库卡片 - 响应式设计
-  Widget _buildKnowledgeCard(
+  // 构建人设卡卡片 - 响应式设计
+  Widget _buildPersonaCard(
     BuildContext context,
-    Knowledge knowledge,
+    Persona persona,
     bool isLargeScreen,
   ) {
     return Card(
@@ -199,8 +200,8 @@ class KnowledgeTabContent extends StatelessWidget {
         onTap: () {
           Navigator.pushNamed(
             context,
-            AppRouter.knowledgeDetail,
-            arguments: knowledge.id,
+            AppRouter.personaDetail,
+            arguments: persona.id,
           );
         },
         borderRadius: BorderRadius.circular(8),
@@ -213,7 +214,7 @@ class KnowledgeTabContent extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      knowledge.name,
+                      persona.name,
                       style: TextStyle(
                         fontSize: isLargeScreen ? 16 : 14,
                         fontWeight: FontWeight.bold,
@@ -222,7 +223,7 @@ class KnowledgeTabContent extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (knowledge.isPublic)
+                  if (persona.isPublic)
                     Icon(
                       Icons.public,
                       size: isLargeScreen ? 20 : 16,
@@ -233,12 +234,10 @@ class KnowledgeTabContent extends StatelessWidget {
               SizedBox(height: isLargeScreen ? 8 : 6),
               Expanded(
                 child: Text(
-                  knowledge.description,
+                  persona.description,
                   style: TextStyle(
                     fontSize: isLargeScreen ? 14 : 12,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: AppColors.onSurfaceWithOpacity07(context),
                   ),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
@@ -249,21 +248,10 @@ class KnowledgeTabContent extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '作者: ${knowledge.authorName}',
+                    '作者: ${persona.authorName}',
                     style: TextStyle(
                       fontSize: isLargeScreen ? 12 : 10,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  Text(
-                    '${knowledge.fileNames.length} 文件',
-                    style: TextStyle(
-                      fontSize: isLargeScreen ? 12 : 10,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: AppColors.onSurfaceWithOpacity05(context),
                     ),
                   ),
                 ],

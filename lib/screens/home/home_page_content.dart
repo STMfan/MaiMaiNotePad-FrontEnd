@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/user_provider.dart';
-import '../providers/theme_provider.dart';
-import '../constants/app_constants.dart';
-import '../utils/app_router.dart';
+import '../../providers/user_provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../constants/app_constants.dart';
+import '../../utils/app_router.dart';
+import '../../utils/app_colors.dart';
 
 // 主页内容组件
 class HomePageContent extends StatelessWidget {
@@ -284,7 +285,7 @@ class HomePageContent extends StatelessWidget {
                 description,
                 style: TextStyle(
                   fontSize: isLargeScreen ? 12 : 10,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: AppColors.onSurfaceWithOpacity05(context),
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,

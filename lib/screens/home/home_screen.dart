@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/knowledge.dart';
-import '../models/persona.dart';
-import '../providers/user_provider.dart';
-import '../providers/theme_provider.dart';
-import '../constants/app_constants.dart';
-import '../utils/app_router.dart';
-import 'admin_overview_tab_content.dart';
-import 'upload_management_tab_content.dart';
-import 'review_tab_content.dart';
-import 'knowledge_tab_content.dart';
-import 'persona_tab_content.dart';
-import 'message_tab_content.dart';
-import 'profile_tab_content.dart';
+import '../../models/knowledge.dart';
+import '../../models/persona.dart';
+import '../../providers/user_provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../constants/app_constants.dart';
+import '../../utils/app_router.dart';
+import '../admin/overview_tab_content.dart';
+import '../admin/upload_management_tab_content.dart';
+import '../admin/review_tab_content.dart';
+import '../knowledge/tab_content.dart';
+import '../persona/tab_content.dart';
+import '../message/tab_content.dart';
+import '../user/profile_tab_content.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

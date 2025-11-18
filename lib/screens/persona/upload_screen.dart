@@ -2,22 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
-import '../providers/user_provider.dart';
-import '../services/api_service.dart';
-import '../constants/app_constants.dart';
-import '../widgets/custom_text_field.dart';
+import '../../providers/user_provider.dart';
+import '../../services/api_service.dart';
+import '../../constants/app_constants.dart';
+import '../../widgets/custom_text_field.dart';
 
-class KnowledgeUploadScreen extends StatefulWidget {
-  const KnowledgeUploadScreen({super.key});
+class PersonaUploadScreen extends StatefulWidget {
+  const PersonaUploadScreen({super.key});
 
   @override
-  State<KnowledgeUploadScreen> createState() => _KnowledgeUploadScreenState();
+  State<PersonaUploadScreen> createState() => _PersonaUploadScreenState();
 }
 
-class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
+class _PersonaUploadScreenState extends State<PersonaUploadScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _copyrightController = TextEditingController();
+  final _authorController = TextEditingController();
   final _tagsController = TextEditingController();
   List<PlatformFile> _selectedFiles = [];
   bool _isUploading = false;
@@ -26,7 +26,7 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
-    _copyrightController.dispose();
+    _authorController.dispose();
     _tagsController.dispose();
     super.dispose();
   }
@@ -35,11 +35,26 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: AppConstants.knowledgeFileTypes,
+        allowedExtensions: AppConstants.personaFileTypes,
         allowMultiple: true,
       );
 
       if (result != null) {
+        // 检查文件数量限制
+        if (result.files.length > 2) {
+          _showError('人设卡最多只能上传2个文件');
+          return;
+        }
+
+        // 验证文件格式
+        for (var file in result.files) {
+          final extension = file.extension?.toLowerCase();
+          if (!AppConstants.personaFileTypes.contains(extension)) {
+            _showError('只支持 .toml 格式的文件');
+            return;
+          }
+        }
+
         setState(() {
           _selectedFiles = result.files;
         });
@@ -54,31 +69,24 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
         }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('选择文件失败: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
+      _showError('选择文件失败: $e');
     }
   }
 
-  Future<void> _uploadKnowledge() async {
+  Future<void> _uploadPersona() async {
     // 表单验证
     if (_nameController.text.trim().isEmpty) {
-      _showError('请输入知识库名称');
+      _showError('请输入人设卡名称');
       return;
     }
 
     if (_descriptionController.text.trim().isEmpty) {
-      _showError('请输入知识库简介');
+      _showError('请输入人设卡简介');
       return;
     }
 
     if (_selectedFiles.isEmpty) {
-      _showError('请选择至少一个文件');
+      _showError('请选择至少一个.toml文件');
       return;
     }
 
@@ -101,8 +109,8 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
       final metadata = {
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
-        'copyright_owner': _copyrightController.text.trim().isNotEmpty
-            ? _copyrightController.text.trim()
+        'copyright_owner': _authorController.text.trim().isNotEmpty
+            ? _authorController.text.trim()
             : '',
         'isPublic': 'false', // 默认不公开，需要审核
       };
@@ -125,10 +133,10 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
         );
       }
 
-      final response = await apiService.upload('/api/knowledge/upload', formData);
+      final response = await apiService.upload('/api/persona/upload', formData);
 
       if (response.data['success'] == true) {
-        _showSuccess('知识库上传成功，等待审核');
+        _showSuccess('人设卡上传成功，等待审核');
         _clearForm();
 
         // 延迟返回，让用户看到成功消息
@@ -152,7 +160,7 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
   void _clearForm() {
     _nameController.clear();
     _descriptionController.clear();
-    _copyrightController.clear();
+    _authorController.clear();
     _tagsController.clear();
     setState(() {
       _selectedFiles = [];
@@ -191,7 +199,7 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('上传知识库'),
+        title: const Text('上传人设卡'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -245,18 +253,18 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
                       Expanded(
                         child: CustomTextField(
                           controller: _nameController,
-                          labelText: '知识库名称',
-                          hintText: '请输入知识库名称',
-                          prefixIcon: Icons.title,
+                          labelText: '人设卡名称',
+                          hintText: '请输入人设卡名称',
+                          prefixIcon: Icons.person,
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: CustomTextField(
-                          controller: _copyrightController,
-                          labelText: '版权所有者（可选）',
-                          hintText: '请输入版权所有者或留空',
-                          prefixIcon: Icons.copyright,
+                          controller: _authorController,
+                          labelText: '作者（可选）',
+                          hintText: '请输入人设卡的作者或留空',
+                          prefixIcon: Icons.edit_note,
                         ),
                       ),
                     ],
@@ -264,8 +272,8 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _descriptionController,
-                    labelText: '知识库简介',
-                    hintText: '请详细描述知识库的内容和用途',
+                    labelText: '人设卡简介',
+                    hintText: '请详细描述人设卡的特色和用途',
                     maxLines: 4,
                     prefixIcon: Icons.description,
                   ),
@@ -273,36 +281,36 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
                   CustomTextField(
                     controller: _tagsController,
                     labelText: '标签（可选）',
-                    hintText: '请用逗号分隔多个标签，如：编程,Python,教程',
+                    hintText: '请用逗号分隔多个标签，如：原创,萌系,温柔',
                     prefixIcon: Icons.tag,
                   ),
                 ] else ...[
                   CustomTextField(
                     controller: _nameController,
-                    labelText: '知识库名称',
-                    hintText: '请输入知识库名称',
-                    prefixIcon: Icons.title,
+                    labelText: '人设卡名称',
+                    hintText: '请输入人设卡名称',
+                    prefixIcon: Icons.person,
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _descriptionController,
-                    labelText: '知识库简介',
-                    hintText: '请详细描述知识库的内容和用途',
+                    labelText: '人设卡简介',
+                    hintText: '请详细描述人设卡的特色和用途',
                     maxLines: 4,
                     prefixIcon: Icons.description,
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
-                    controller: _copyrightController,
-                    labelText: '版权所有者（可选）',
-                    hintText: '请输入版权所有者或留空',
-                    prefixIcon: Icons.copyright,
+                    controller: _authorController,
+                    labelText: '作者（可选）',
+                    hintText: '请输入人设卡的作者或留空',
+                    prefixIcon: Icons.edit_note,
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _tagsController,
                     labelText: '标签（可选）',
-                    hintText: '请用逗号分隔多个标签，如：编程,Python,教程',
+                    hintText: '请用逗号分隔多个标签，如：原创,萌系,温柔',
                     prefixIcon: Icons.tag,
                   ),
                 ],
@@ -321,7 +329,7 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _isUploading ? null : _uploadKnowledge,
+                    onPressed: _isUploading ? null : _uploadPersona,
                     icon: _isUploading
                         ? const SizedBox(
                             width: 16,
@@ -381,17 +389,28 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
           // 选择文件按钮
           ElevatedButton.icon(
             onPressed: _pickFiles,
+            label: const Text('选择.toml文件'),
             icon: const Icon(Icons.file_upload),
-            label: const Text('选择文件'),
           ),
 
           const SizedBox(height: 16),
 
           // 支持格式说明
           Text(
-            '支持格式：${AppConstants.knowledgeFileTypes.join(", ")}',
+            '支持格式：${AppConstants.personaFileTypes.join(", ")} 最多2个文件',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            '人设卡文件通常包含角色的详细信息',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontStyle: FontStyle.italic,
             ),
             textAlign: TextAlign.center,
           ),
@@ -413,7 +432,7 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.insert_drive_file, size: 16),
+                    const Icon(Icons.person_pin_circle, size: 16),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -438,6 +457,12 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
                   _selectedFiles.clear();
                 });
               },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+              ),
               child: const Text('清空文件'),
             ),
           ],

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/knowledge.dart';
-import '../models/persona.dart';
-import '../providers/user_provider.dart';
-import '../services/api_service.dart';
-import '../utils/app_theme.dart';
-import 'knowledge_detail_screen.dart';
-import 'persona_detail_screen.dart';
+import '../../models/knowledge.dart';
+import '../../models/persona.dart';
+import '../../providers/user_provider.dart';
+import '../../services/api_service.dart';
+import '../../utils/app_theme.dart';
+import '../knowledge/detail_screen.dart';
+import '../persona/detail_screen.dart';
 
 class StarsScreen extends StatefulWidget {
   const StarsScreen({super.key});

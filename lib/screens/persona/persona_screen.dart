@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../models/persona.dart';
-import '../services/api_service.dart';
-import '../utils/app_router.dart';
+import '../../models/persona.dart';
+import '../../services/api_service.dart';
+import '../../utils/app_router.dart';
 
 class PersonaScreen extends StatefulWidget {
   const PersonaScreen({super.key});

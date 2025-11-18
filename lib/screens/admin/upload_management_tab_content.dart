@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import '../services/api_service.dart';
-import '../widgets/custom_text_field.dart';
+import '../../services/api_service.dart';
+import '../../widgets/custom_text_field.dart';
 
 class UploadManagementTabContent extends StatefulWidget {
   const UploadManagementTabContent({super.key});

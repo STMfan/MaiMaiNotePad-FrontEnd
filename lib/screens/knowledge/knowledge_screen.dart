@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../models/knowledge.dart';
-import '../services/api_service.dart';
-import '../utils/app_router.dart';
+import '../../models/knowledge.dart';
+import '../../services/api_service.dart';
+import '../../utils/app_router.dart';
 
 class KnowledgeScreen extends StatefulWidget {
   const KnowledgeScreen({super.key});
