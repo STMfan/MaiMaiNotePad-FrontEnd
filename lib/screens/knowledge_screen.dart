@@ -151,8 +151,13 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // 跳转到上传页面
-          Navigator.pushNamed(context, AppRouter.knowledgeUpload);
+          // 显示提示信息，引导用户使用上传管理功能
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('请使用首页的上传管理功能来上传知识库'),
+              duration: Duration(seconds: 2),
+            ),
+          );
         },
         child: const Icon(Icons.add),
       ),

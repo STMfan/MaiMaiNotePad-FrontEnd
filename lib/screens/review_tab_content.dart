@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-
 import '../services/api_service.dart';
 import '../models/knowledge.dart';
 import '../models/persona.dart';
 
-class ReviewScreen extends StatefulWidget {
-  const ReviewScreen({super.key});
+class ReviewTabContent extends StatefulWidget {
+  const ReviewTabContent({super.key});
 
   @override
-  State<ReviewScreen> createState() => _ReviewScreenState();
+  State<ReviewTabContent> createState() => _ReviewTabContentState();
 }
 
-class _ReviewScreenState extends State<ReviewScreen>
+class _ReviewTabContentState extends State<ReviewTabContent>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Knowledge> _pendingKnowledge = [];
@@ -41,8 +40,6 @@ class _ReviewScreenState extends State<ReviewScreen>
     });
 
     try {
-      // 注意：这里假设后端有获取待审核项目的接口
-      // 如果没有，可能需要使用其他接口
       final apiService = ApiService();
 
       // 获取待审核的知识库
@@ -180,6 +177,13 @@ class _ReviewScreenState extends State<ReviewScreen>
             Tab(text: '人设卡'),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadPendingItems,
+            tooltip: '刷新',
+          ),
+        ],
       ),
       body: TabBarView(
         controller: _tabController,
