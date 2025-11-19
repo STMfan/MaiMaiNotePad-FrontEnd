@@ -5,7 +5,7 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // API配置
-  static const String defaultApiBaseUrl = 'http://localhost:9278';
+  static const String apiBaseUrl = 'http://localhost:9278';
   static const String apiBaseUrlKey = 'api_base_url';
 
   // 本地存储键

@@ -19,8 +19,7 @@ class ApiService {
   void _initDio() async {
     final prefs = await SharedPreferences.getInstance();
     final baseUrl =
-        prefs.getString(AppConstants.apiBaseUrlKey) ??
-        AppConstants.defaultApiBaseUrl;
+        prefs.getString(AppConstants.apiBaseUrlKey) ?? AppConstants.apiBaseUrl;
 
     _dio = Dio(
       BaseOptions(
@@ -73,7 +72,7 @@ class ApiService {
   Future<String> getCurrentBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(AppConstants.apiBaseUrlKey) ??
-        AppConstants.defaultApiBaseUrl;
+        AppConstants.apiBaseUrl;
   }
 
   // GET请求
@@ -82,7 +81,16 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      return await _dio.get(path, queryParameters: queryParameters);
+      final response = await _dio.get(path, queryParameters: queryParameters);
+
+      // 处理响应格式不匹配问题
+      // 如果后端直接返回数据（没有success/data包装），则包装成统一格式
+      if (response.data is List ||
+          (response.data is Map && !response.data.containsKey('success'))) {
+        response.data = {'success': true, 'data': response.data};
+      }
+
+      return response;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -103,12 +111,21 @@ class ApiService {
           'Accept': 'application/json, text/plain, */*', // 接受多种响应类型
         },
       );
-      return await _dio.post(
+      final response = await _dio.post(
         path,
         data: data,
         queryParameters: queryParameters,
         options: options,
       );
+
+      // 处理响应格式不匹配问题
+      // 如果后端直接返回数据（没有success/data包装），则包装成统一格式
+      if (response.data is List ||
+          (response.data is Map && !response.data.containsKey('success'))) {
+        response.data = {'success': true, 'data': response.data};
+      }
+
+      return response;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -121,7 +138,20 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      return await _dio.put(path, data: data, queryParameters: queryParameters);
+      final response = await _dio.put(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
+
+      // 处理响应格式不匹配问题
+      // 如果后端直接返回数据（没有success/data包装），则包装成统一格式
+      if (response.data is List ||
+          (response.data is Map && !response.data.containsKey('success'))) {
+        response.data = {'success': true, 'data': response.data};
+      }
+
+      return response;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -130,10 +160,24 @@ class ApiService {
   // DELETE请求
   Future<Response> delete(
     String path, {
+    dynamic data,
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      return await _dio.delete(path, queryParameters: queryParameters);
+      final response = await _dio.delete(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
+
+      // 处理响应格式不匹配问题
+      // 如果后端直接返回数据（没有success/data包装），则包装成统一格式
+      if (response.data is List ||
+          (response.data is Map && !response.data.containsKey('success'))) {
+        response.data = {'success': true, 'data': response.data};
+      }
+
+      return response;
     } on DioException catch (e) {
       throw _handleError(e);
     }

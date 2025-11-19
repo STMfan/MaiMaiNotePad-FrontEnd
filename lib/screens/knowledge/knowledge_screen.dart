@@ -36,7 +36,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
 
     try {
       final apiService = ApiService();
-      final response = await apiService.get('/api/knowledge');
+      final response = await apiService.get('/knowledge');
       final data = response.data;
 
       if (data['success'] == true) {

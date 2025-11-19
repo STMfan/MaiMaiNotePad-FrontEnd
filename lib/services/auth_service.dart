@@ -13,7 +13,7 @@ class AuthService {
     try {
       // 首先尝试JSON响应
       var response = await _apiService.post(
-        '/api/token',
+        '/token',
         data: {'username': username, 'password': password},
         responseType: ResponseType.json,
       );
@@ -26,7 +26,7 @@ class AuthService {
           print('JSON响应为空，尝试纯文本响应');
           try {
             final plainResponse = await _apiService.post(
-              '/api/token',
+              '/token',
               data: {'username': username, 'password': password},
               responseType: ResponseType.plain,
             );
