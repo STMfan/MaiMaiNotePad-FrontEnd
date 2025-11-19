@@ -13,7 +13,7 @@ class AuthService {
     try {
       // 首先尝试JSON响应
       var response = await _apiService.post(
-        '/token',
+        '/api/token',
         data: {'username': username, 'password': password},
         responseType: ResponseType.json,
       );
@@ -26,7 +26,7 @@ class AuthService {
           print('JSON响应为空，尝试纯文本响应');
           try {
             final plainResponse = await _apiService.post(
-              '/token',
+              '/api/token',
               data: {'username': username, 'password': password},
               responseType: ResponseType.plain,
             );
@@ -71,6 +71,20 @@ class AuthService {
           });
         } else if (data is String) {
           print('响应数据是字符串: $data');
+          // 如果是字符串，尝试作为JSON解析
+          try {
+            final parsedData = json.decode(data);
+            print('字符串JSON解析成功: ${parsedData.runtimeType}');
+            if (parsedData is Map) {
+              print('解析后的字段: ${parsedData.keys.toList()}');
+              parsedData.forEach((key, value) {
+                print('解析后字段 $key: $value');
+              });
+              data = parsedData; // 使用解析后的数据
+            }
+          } catch (e) {
+            print('字符串JSON解析失败: $e');
+          }
         } else {
           print('响应数据是其他类型: ${data.runtimeType}');
         }
@@ -114,6 +128,22 @@ class AuthService {
           print('使用access_token字段获取到token: $token');
         }
 
+        // 如果根级别没有找到token，尝试从data对象中获取
+        if (token == null && data['data'] != null) {
+          final innerData = data['data'];
+          if (innerData is Map) {
+            token = innerData['access_token'];
+            if (token == null) {
+              token = innerData['token'];
+              if (token != null) {
+                print('使用data对象中的token字段获取到token: $token');
+              }
+            } else {
+              print('使用data对象中的access_token字段获取到token: $token');
+            }
+          }
+        }
+
         if (token == null) {
           return {
             'success': false,
@@ -123,17 +153,15 @@ class AuthService {
 
         // 尝试不同的用户字段名
         var user = data['user'];
-        if (user == null) {
-          user = data['data'];
-          if (user != null) {
-            print('使用data字段获取到user: $user');
-          }
-        } else {
+        if (user != null) {
           print('使用user字段获取到user: $user');
         }
 
-        // 如果没有找到user字段，尝试从JWT token中解码用户信息
-        if (user == null && token != null) {
+        // 如果没有找到user字段或者user字段是token数据，尝试从JWT token中解码用户信息
+        if (user == null ||
+            (user is Map &&
+                user.keys.length <= 3 &&
+                user.containsKey('access_token'))) {
           print('未找到user字段，尝试从JWT token解码用户信息');
           try {
             // JWT token格式：header.payload.signature
@@ -155,13 +183,34 @@ class AuthService {
 
               // 从JWT payload中提取用户信息
               if (jwtPayload is Map) {
+                print('JWT payload中的所有字段: ${jwtPayload.keys.join(', ')}');
+
+                // 尝试不同的用户ID字段
+                var jwtUserId = jwtPayload['sub'];
+                if (jwtUserId == null) {
+                  jwtUserId = jwtPayload['id'];
+                  if (jwtUserId == null) {
+                    jwtUserId = jwtPayload['user_id'];
+                  }
+                }
+                print(
+                  'JWT用户ID提取结果: sub=${jwtPayload['sub']}, id=${jwtPayload['id']}, user_id=${jwtPayload['user_id']}, 最终结果: $jwtUserId',
+                );
+
                 user = {
-                  'id': jwtPayload['sub'], // JWT标准字段：subject
-                  'username': jwtPayload['username'], // 你的JWT中的字段
-                  'role': jwtPayload['role'], // 你的JWT中的字段
+                  'id': jwtUserId,
+                  'username':
+                      jwtPayload['username'] ??
+                      jwtPayload['name'], // 尝试不同的用户名字段
+                  'role':
+                      jwtPayload['role'] ??
+                      jwtPayload['role_name'] ??
+                      'user', // 尝试不同的角色字段
                 };
                 print('从JWT解码的用户信息: $user');
               }
+            } else {
+              print('JWT token格式不正确，parts长度: ${parts.length}');
             }
           } catch (e) {
             print('JWT解码失败: $e');
@@ -172,10 +221,28 @@ class AuthService {
         if (user == null && token != null) {
           print('JWT解码失败，尝试调用单独的用户信息接口');
           try {
-            final userResponse = await _apiService.get('/users/me');
+            final userResponse = await _apiService.get('/api/users/me');
+            print('用户信息接口响应状态码: ${userResponse.statusCode}');
+            print('用户信息接口响应数据: ${userResponse.data}');
+
             if (userResponse.statusCode == 200) {
               user = userResponse.data;
-              print('从用户信息接口获取的用户信息: $user');
+
+              print('用户信息接口原始响应: $user');
+
+              // 如果响应是嵌套的格式，尝试提取用户信息
+              if (user is Map) {
+                if (user['data'] != null) {
+                  user = user['data'];
+                  print('从用户信息接口的data字段获取的用户信息: $user');
+                } else {
+                  print('从用户信息接口获取的用户信息: $user');
+                }
+
+                // 检查用户信息中的ID字段
+                print('用户信息中的所有字段: ${user.keys.join(', ')}');
+                print('用户ID检查: id=${user['id']}, user_id=${user['user_id']}');
+              }
             } else {
               print('用户信息接口返回状态码: ${userResponse.statusCode}');
             }
@@ -237,7 +304,7 @@ class AuthService {
   // 获取当前用户信息
   Future<Map<String, dynamic>?> getCurrentUser() async {
     try {
-      final response = await _apiService.get('/users/me');
+      final response = await _apiService.get('/api/users/me');
 
       if (response.statusCode == 200) {
         return response.data;

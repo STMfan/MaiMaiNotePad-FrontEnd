@@ -128,6 +128,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
+  // 切换到指定tab的方法
+  void _switchToTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  // 切换到上传管理tab
+  void _switchToUploadManagementTab() {
+    // 计算上传管理tab的索引
+    int uploadManagementIndex = 4; // 知识库(0) + 人设卡(1) + 消息(2) + 个人资料(3) = 4
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    if (userProvider.currentUser?.isAdminOrModerator == true) {
+      uploadManagementIndex += 1; // 审核管理
+    }
+    if (userProvider.currentUser?.role == 'admin') {
+      uploadManagementIndex += 1; // 管理员概览
+    }
+    // 现在的uploadManagementIndex就是上传管理的索引
+
+    setState(() {
+      _currentIndex = uploadManagementIndex;
+    });
+  }
+
   // 页面列表 - 根据用户权限动态生成
   List<Widget> _buildPages(UserProvider userProvider) {
     final basePages = [
@@ -138,6 +163,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             : _filteredKnowledgeList,
         searchController: _knowledgeSearchController,
         onSearch: _searchKnowledge,
+        onSwitchToUploadManagement: _switchToUploadManagementTab,
       ),
       PersonaTabContent(
         personaList: _filteredPersonaList.isEmpty && _personaSearchQuery.isEmpty
@@ -145,6 +171,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             : _filteredPersonaList,
         searchController: _personaSearchController,
         onSearch: _searchPersona,
+        onSwitchToUploadManagement: _switchToUploadManagementTab,
       ),
       MessageTabContent(),
       ProfileTabContent(),

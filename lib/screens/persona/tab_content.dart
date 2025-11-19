@@ -10,12 +10,14 @@ class PersonaTabContent extends StatelessWidget {
   final List<Persona> personaList;
   final TextEditingController searchController;
   final Function(String) onSearch;
+  final VoidCallback? onSwitchToUploadManagement;
 
   const PersonaTabContent({
     super.key,
     required this.personaList,
     required this.searchController,
     required this.onSearch,
+    this.onSwitchToUploadManagement,
   });
 
   @override
@@ -122,23 +124,42 @@ class PersonaTabContent extends StatelessWidget {
                                   ),
                                 ),
                                 SizedBox(height: isLargeScreen ? 12 : 8),
-                                if (!userProvider.isLoggedIn)
-                                  Text(
-                                    '请登录后创建人设卡',
-                                    style: TextStyle(
-                                      fontSize: isLargeScreen ? 14 : 12,
-                                      color: AppColors.disabled(context),
-                                    ),
+                                Text(
+                                  userProvider.isLoggedIn
+                                      ? (userProvider
+                                                    .currentUser
+                                                    ?.isAdminOrModerator ==
+                                                true
+                                            ? '点击创建人设卡'
+                                            : '创建功能仅对管理员和审核员开放')
+                                      : '请登录后创建人设卡',
+                                  style: TextStyle(
+                                    fontSize: isLargeScreen ? 14 : 12,
+                                    color: AppColors.disabled(context),
                                   ),
+                                ),
                                 SizedBox(height: isLargeScreen ? 24 : 16),
                                 if (userProvider.isLoggedIn)
                                   ElevatedButton.icon(
                                     onPressed: () {
-                                      Navigator.pushNamed(
-                                        context,
-                                        AppRouter.upload,
-                                        arguments: 'persona',
-                                      );
+                                      // 导航到上传管理tab（管理员和审核员可见）
+                                      if (userProvider
+                                              .currentUser
+                                              ?.isAdminOrModerator ==
+                                          true) {
+                                        // 调用父组件提供的切换tab回调
+                                        onSwitchToUploadManagement?.call();
+                                      } else {
+                                        // 如果是普通用户，显示提示信息
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('创建人设卡功能仅对管理员和审核员开放'),
+                                            backgroundColor: Colors.orange,
+                                          ),
+                                        );
+                                      }
                                     },
                                     icon: const Icon(Icons.person_add),
                                     label: Text(

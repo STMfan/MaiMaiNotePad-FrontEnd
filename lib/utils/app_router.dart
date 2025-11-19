@@ -5,7 +5,8 @@ import '../screens/knowledge/screens.dart';
 import '../screens/persona/screens.dart';
 import '../screens/message/screens.dart';
 import '../screens/shared/screens.dart';
-import '../screens/admin/unified_upload_screen.dart';
+
+import '../models/knowledge.dart';
 
 class AppRouter {
   static const String home = '/';
@@ -18,6 +19,7 @@ class AppRouter {
   static const String knowledgeDetail = '/knowledge_detail';
   static const String personaDetail = '/persona_detail';
   static const String upload = '/upload';
+  static const String editKnowledge = '/editKnowledge';
 
   // 创建带动画的路由
   static Route<T> _createRoute<T>(
@@ -80,15 +82,12 @@ class AppRouter {
           PersonaDetailScreen(personaId: personaId ?? ''),
           settings,
         );
-      case upload:
+      // Upload路由已删除，统一上传功能通过管理页面提供
+      case editKnowledge:
         final args = settings.arguments as Map<String, dynamic>?;
-        final initialType = args?['type'] as String?;
+        final knowledge = args?['knowledge'] as Knowledge?;
         return _createRoute(
-          UnifiedUploadScreen(
-            initialType: initialType == 'persona'
-                ? UploadType.persona
-                : UploadType.knowledge,
-          ),
+          EditKnowledgeScreen(knowledge: knowledge!),
           settings,
         );
       default:

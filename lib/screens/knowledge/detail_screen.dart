@@ -6,6 +6,7 @@ import '../../models/knowledge.dart';
 import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
+import '../knowledge/edit_screen.dart';
 
 class KnowledgeDetailScreen extends StatefulWidget {
   final String knowledgeId;
@@ -160,7 +161,18 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
         backgroundColor: AppTheme.primaryOrange,
         foregroundColor: Colors.white,
         actions: [
-          if (_knowledge != null)
+          if (_knowledge != null) ...[
+            // 编辑按钮
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.white),
+              onPressed: _editKnowledge,
+            ),
+            // 删除按钮
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.white),
+              onPressed: _deleteKnowledge,
+            ),
+            // 收藏按钮
             IconButton(
               icon: _isStarring
                   ? const SizedBox(
@@ -174,6 +186,7 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
                     ),
               onPressed: _toggleStar,
             ),
+          ],
         ],
       ),
       body: _isLoading
@@ -350,5 +363,73 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  // 编辑知识库
+  void _editKnowledge() async {
+    if (_knowledge == null) return;
+    
+    final result = await Navigator.pushNamed(
+      context,
+      '/editKnowledge',
+      arguments: _knowledge,
+    );
+    
+    if (result == true) {
+      // 编辑成功，重新加载数据
+      _loadKnowledgeDetail();
+    }
+  }
+
+  // 删除知识库
+  void _deleteKnowledge() async {
+    if (_knowledge == null) return;
+    
+    // 显示确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要删除知识库"${_knowledge!.title}"吗？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      try {
+        setState(() {
+          _isLoading = true;
+          _errorMessage = null;
+        });
+        
+        await ApiService().deleteKnowledge(_knowledge!.id);
+        
+        // 删除成功，返回上一页
+        Navigator.of(context).pop(true);
+        
+        // 显示成功消息
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('知识库删除成功')),
+        );
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString();
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除失败: ${e.toString()}')),
+        );
+      }
+    }
   }
 }

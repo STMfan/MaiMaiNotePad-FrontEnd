@@ -632,4 +632,37 @@ class ApiService {
       throw _handleError(e);
     }
   }
+
+  // 删除知识库
+  Future<void> deleteKnowledge(String knowledgeId) async {
+    try {
+      await delete('/knowledge/$knowledgeId');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 更新知识库
+  Future<Knowledge> updateKnowledge({
+    required String knowledgeId,
+    String? name,
+    String? description,
+    String? content,
+    List<String>? tags,
+    bool? isPublic,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (name != null) data['name'] = name;
+      if (description != null) data['description'] = description;
+      if (content != null) data['content'] = content;
+      if (tags != null) data['tags'] = tags.join(',');
+      if (isPublic != null) data['isPublic'] = isPublic;
+
+      final response = await put('/knowledge/$knowledgeId', data: data);
+      return Knowledge.fromJson(response.data);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
 }

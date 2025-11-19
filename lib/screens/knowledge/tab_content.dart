@@ -10,12 +10,14 @@ class KnowledgeTabContent extends StatelessWidget {
   final List<Knowledge> knowledgeList;
   final TextEditingController searchController;
   final Function(String) onSearch;
+  final VoidCallback? onSwitchToUploadManagement;
 
   const KnowledgeTabContent({
     super.key,
     required this.knowledgeList,
     required this.searchController,
     required this.onSearch,
+    this.onSwitchToUploadManagement,
   });
 
   @override
@@ -123,7 +125,11 @@ class KnowledgeTabContent extends StatelessWidget {
                                 ),
                                 SizedBox(height: isLargeScreen ? 12 : 8),
                                 Text(
-                                  '请登录后上传知识库文件',
+                                  userProvider.isLoggedIn
+                                      ? (userProvider.currentUser?.isAdminOrModerator == true
+                                          ? '点击上传知识库文件'
+                                          : '上传功能仅对管理员和审核员开放')
+                                      : '请登录后上传知识库文件',
                                   style: TextStyle(
                                     fontSize: isLargeScreen ? 14 : 12,
                                     color: AppColors.disabled(context),
@@ -133,12 +139,19 @@ class KnowledgeTabContent extends StatelessWidget {
                                 if (userProvider.isLoggedIn)
                                   ElevatedButton.icon(
                                     onPressed: () {
-                                      // 使用回调函数导航到上传管理
-                                      // 注意：这里需要父组件提供导航回调
-                                      Navigator.pushNamed(
-                                        context,
-                                        AppRouter.knowledge,
-                                      );
+                                      // 导航到上传管理tab（管理员和审核员可见）
+                                      if (userProvider.currentUser?.isAdminOrModerator == true) {
+                                        // 调用父组件提供的切换tab回调
+                                        onSwitchToUploadManagement?.call();
+                                      } else {
+                                        // 如果是普通用户，显示提示信息
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('上传功能仅对管理员和审核员开放'),
+                                            backgroundColor: Colors.orange,
+                                          ),
+                                        );
+                                      }
                                     },
                                     icon: const Icon(Icons.upload_file),
                                     label: Text(

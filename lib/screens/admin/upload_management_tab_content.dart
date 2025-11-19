@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/api_service.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../constants/app_constants.dart';
 
 class UploadManagementTabContent extends StatefulWidget {
   const UploadManagementTabContent({super.key});
@@ -148,11 +149,23 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'doc', 'docx', 'txt', 'md'],
+        allowedExtensions: AppConstants.knowledgeFileTypes,
         allowMultiple: true,
       );
 
       if (result != null && result.files.isNotEmpty) {
+        // 限制知识库最多100个文件
+        if (result.files.length > 100) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('知识库最多只能上传100个文件'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
         setState(() {
           _knowledgeFiles = result.files;
         });
@@ -173,11 +186,23 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'doc', 'docx', 'txt', 'md'],
+        allowedExtensions: AppConstants.personaFileTypes,
         allowMultiple: true,
       );
 
       if (result != null && result.files.isNotEmpty) {
+        // 限制人设卡最多2个文件
+        if (result.files.length > 2) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('人设卡最多只能上传2个文件'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
         setState(() {
           _personaFiles = result.files;
         });
@@ -410,122 +435,149 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('上传知识库'),
-          content: SingleChildScrollView(
+        builder: (context, setState) => Dialog(
+          insetPadding: const EdgeInsets.all(20),
+          child: Container(
+            width: MediaQuery.of(context).size.width > 600 
+                ? MediaQuery.of(context).size.width * 0.6 
+                : MediaQuery.of(context).size.width * 0.9,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CustomTextField(
-                  controller: _knowledgeNameController,
-                  labelText: '知识库名称 *',
-                  hintText: '请输入知识库名称',
+                Text(
+                  '上传知识库',
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: _knowledgeDescriptionController,
-                  labelText: '描述',
-                  hintText: '请输入知识库描述',
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: _knowledgeCopyrightController,
-                  labelText: '版权信息',
-                  hintText: '请输入版权信息（可选）',
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: _knowledgeTagsController,
-                  labelText: '标签',
-                  hintText: '请输入标签，用逗号分隔',
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        await _pickKnowledgeFiles();
-                        setState(() {}); // 更新对话框状态
-                      },
-                      icon: const Icon(Icons.attach_file),
-                      label: const Text('选择文件'),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      _knowledgeFiles.isEmpty
-                          ? '未选择文件'
-                          : '已选择 ${_knowledgeFiles.length} 个文件',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-                if (_knowledgeFiles.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: SingleChildScrollView(
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '已选择的文件：',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                        CustomTextField(
+                          controller: _knowledgeNameController,
+                          labelText: '知识库名称 *',
+                          hintText: '请输入知识库名称',
                         ),
-                        const SizedBox(height: 4),
-                        ..._knowledgeFiles.map(
-                          (file) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _knowledgeDescriptionController,
+                          labelText: '描述',
+                          hintText: '请输入知识库描述',
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _knowledgeCopyrightController,
+                          labelText: '版权信息',
+                          hintText: '请输入版权信息（可选）',
+                        ),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _knowledgeTagsController,
+                          labelText: '标签',
+                          hintText: '请输入标签，用逗号分隔',
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                await _pickKnowledgeFiles();
+                                setState(() {}); // 更新对话框状态
+                              },
+                              icon: const Icon(Icons.attach_file),
+                              label: const Text('选择文件'),
+                            ),
+                            const SizedBox(width: 16),
+                            Text(
+                              _knowledgeFiles.isEmpty
+                                  ? '未选择文件'
+                                  : '已选择 ${_knowledgeFiles.length} 个文件',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                        if (_knowledgeFiles.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.insert_drive_file, size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    file.name,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                Text(
+                                  '已选择的文件：',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.close, size: 16),
-                                  onPressed: () {
-                                    setState(() {
-                                      _knowledgeFiles.remove(file);
-                                    });
-                                  },
+                                const SizedBox(height: 4),
+                                ..._knowledgeFiles.map(
+                                  (file) => Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.insert_drive_file, size: 16),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            file.name,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.close, size: 16),
+                                          onPressed: () {
+                                            setState(() {
+                                              _knowledgeFiles.remove(file);
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
-                ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('取消'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _uploadKnowledge();
+                      },
+                      child: const Text('上传'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _uploadKnowledge();
-              },
-              child: const Text('上传'),
-            ),
-          ],
         ),
       ),
     );
@@ -535,122 +587,149 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('上传人设卡'),
-          content: SingleChildScrollView(
+        builder: (context, setState) => Dialog(
+          insetPadding: const EdgeInsets.all(20),
+          child: Container(
+            width: MediaQuery.of(context).size.width > 600 
+                ? MediaQuery.of(context).size.width * 0.6 
+                : MediaQuery.of(context).size.width * 0.9,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CustomTextField(
-                  controller: _personaNameController,
-                  labelText: '人设卡名称 *',
-                  hintText: '请输入人设卡名称',
+                Text(
+                  '上传人设卡',
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: _personaDescriptionController,
-                  labelText: '描述',
-                  hintText: '请输入人设卡描述',
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: _personaAuthorController,
-                  labelText: '作者',
-                  hintText: '请输入作者名称',
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: _personaTagsController,
-                  labelText: '标签',
-                  hintText: '请输入标签，用逗号分隔',
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        await _pickPersonaFiles();
-                        setState(() {}); // 更新对话框状态
-                      },
-                      icon: const Icon(Icons.attach_file),
-                      label: const Text('选择文件'),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      _personaFiles.isEmpty
-                          ? '未选择文件'
-                          : '已选择 ${_personaFiles.length} 个文件',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-                if (_personaFiles.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: SingleChildScrollView(
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '已选择的文件：',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                        CustomTextField(
+                          controller: _personaNameController,
+                          labelText: '人设卡名称 *',
+                          hintText: '请输入人设卡名称',
                         ),
-                        const SizedBox(height: 4),
-                        ..._personaFiles.map(
-                          (file) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _personaDescriptionController,
+                          labelText: '描述',
+                          hintText: '请输入人设卡描述',
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _personaAuthorController,
+                          labelText: '作者',
+                          hintText: '请输入作者信息',
+                        ),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _personaTagsController,
+                          labelText: '标签',
+                          hintText: '请输入标签，用逗号分隔',
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                await _pickPersonaFiles();
+                                setState(() {}); // 更新对话框状态
+                              },
+                              icon: const Icon(Icons.attach_file),
+                              label: const Text('选择文件'),
+                            ),
+                            const SizedBox(width: 16),
+                            Text(
+                              _personaFiles.isEmpty
+                                  ? '未选择文件'
+                                  : '已选择 ${_personaFiles.length} 个文件',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                        if (_personaFiles.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.insert_drive_file, size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    file.name,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                Text(
+                                  '已选择的文件：',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.close, size: 16),
-                                  onPressed: () {
-                                    setState(() {
-                                      _personaFiles.remove(file);
-                                    });
-                                  },
+                                const SizedBox(height: 4),
+                                ..._personaFiles.map(
+                                  (file) => Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.insert_drive_file, size: 16),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            file.name,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.close, size: 16),
+                                          onPressed: () {
+                                            setState(() {
+                                              _personaFiles.remove(file);
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
-                ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('取消'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _uploadPersona();
+                      },
+                      child: const Text('上传'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _uploadPersona();
-              },
-              child: const Text('上传'),
-            ),
-          ],
         ),
       ),
     );
@@ -1261,3 +1340,4 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
     }
   }
 }
+
