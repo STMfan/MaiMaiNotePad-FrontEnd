@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../models/knowledge.dart';
 import '../../models/persona.dart';
+import '../../widgets/pagination_widget.dart';
 
 class ReviewTabContent extends StatefulWidget {
   const ReviewTabContent({super.key});
@@ -17,6 +18,14 @@ class _ReviewTabContentState extends State<ReviewTabContent>
   List<Persona> _pendingPersonas = [];
   bool _isLoading = false;
   String? _error;
+  
+  // 分页状态
+  int _knowledgeCurrentPage = 1;
+  int _knowledgeTotal = 0;
+  int _knowledgePageSize = 20;
+  int _personaCurrentPage = 1;
+  int _personaTotal = 0;
+  int _personaPageSize = 20;
 
   @override
   void initState() {
@@ -31,7 +40,7 @@ class _ReviewTabContentState extends State<ReviewTabContent>
     super.dispose();
   }
 
-  Future<void> _loadPendingItems() async {
+  Future<void> _loadPendingItems({int? knowledgePage, int? personaPage}) async {
     if (!mounted) return;
 
     setState(() {
@@ -42,24 +51,32 @@ class _ReviewTabContentState extends State<ReviewTabContent>
     try {
       final apiService = ApiService();
 
-      // 获取待审核的知识库
-      final knowledgeResponse = await apiService.get('/knowledge/pending');
-      final List<dynamic> knowledgeList = knowledgeResponse.data;
-      final List<Knowledge> knowledgeItems = knowledgeList
-          .map((item) => Knowledge.fromJson(item))
-          .toList();
+      // 获取待审核的知识库（使用封装好的方法）
+      final knowledgeResponse = await apiService.getPendingKnowledge(
+        page: knowledgePage ?? _knowledgeCurrentPage,
+        pageSize: _knowledgePageSize,
+      );
 
-      // 获取待审核的人设卡
-      final personaResponse = await apiService.get('/persona/pending');
-      final List<dynamic> personaList = personaResponse.data;
-      final List<Persona> personaItems = personaList
-          .map((item) => Persona.fromJson(item))
-          .toList();
+      // 获取待审核的人设卡（使用封装好的方法）
+      final personaResponse = await apiService.getPendingPersonas(
+        page: personaPage ?? _personaCurrentPage,
+        pageSize: _personaPageSize,
+      );
 
       if (mounted) {
         setState(() {
-          _pendingKnowledge = knowledgeItems;
-          _pendingPersonas = personaItems;
+          _pendingKnowledge = knowledgeResponse.items;
+          _knowledgeTotal = knowledgeResponse.total;
+          if (knowledgePage != null) {
+            _knowledgeCurrentPage = knowledgePage;
+          }
+          
+          _pendingPersonas = personaResponse.items;
+          _personaTotal = personaResponse.total;
+          if (personaPage != null) {
+            _personaCurrentPage = personaPage;
+          }
+          
           _isLoading = false;
         });
       }
@@ -72,11 +89,19 @@ class _ReviewTabContentState extends State<ReviewTabContent>
       }
     }
   }
+  
+  void _onKnowledgePageChanged(int page) {
+    _loadPendingItems(knowledgePage: page);
+  }
+  
+  void _onPersonaPageChanged(int page) {
+    _loadPendingItems(personaPage: page);
+  }
 
   Future<void> _approveKnowledge(String knowledgeId) async {
     try {
       final apiService = ApiService();
-      await apiService.post('/knowledge/$knowledgeId/approve');
+      await apiService.approveKnowledge(knowledgeId);
 
       setState(() {
         _pendingKnowledge.removeWhere((item) => item.id == knowledgeId);
@@ -99,7 +124,7 @@ class _ReviewTabContentState extends State<ReviewTabContent>
   Future<void> _rejectKnowledge(String knowledgeId) async {
     try {
       final apiService = ApiService();
-      await apiService.post('/knowledge/$knowledgeId/reject');
+      await apiService.rejectKnowledge(knowledgeId);
 
       setState(() {
         _pendingKnowledge.removeWhere((item) => item.id == knowledgeId);
@@ -122,7 +147,7 @@ class _ReviewTabContentState extends State<ReviewTabContent>
   Future<void> _approvePersona(String personaId) async {
     try {
       final apiService = ApiService();
-      await apiService.post('/persona/$personaId/approve');
+      await apiService.approvePersona(personaId);
 
       setState(() {
         _pendingPersonas.removeWhere((item) => item.id == personaId);
@@ -145,7 +170,7 @@ class _ReviewTabContentState extends State<ReviewTabContent>
   Future<void> _rejectPersona(String personaId) async {
     try {
       final apiService = ApiService();
-      await apiService.post('/persona/$personaId/reject');
+      await apiService.rejectPersona(personaId);
 
       setState(() {
         _pendingPersonas.removeWhere((item) => item.id == personaId);
@@ -218,41 +243,55 @@ class _ReviewTabContentState extends State<ReviewTabContent>
     }
 
     return RefreshIndicator(
-      onRefresh: _loadPendingItems,
-      child: ListView.builder(
-        itemCount: _pendingKnowledge.length,
-        itemBuilder: (context, index) {
-          final knowledge = _pendingKnowledge[index];
-          return Card(
-            margin: const EdgeInsets.all(8.0),
-            child: ListTile(
-              title: Text(knowledge.name),
-              subtitle: Text('作者: ${knowledge.authorName}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.check, color: Colors.green),
-                    onPressed: () => _approveKnowledge(knowledge.id),
-                    tooltip: '通过',
+      onRefresh: () => _loadPendingItems(),
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              itemCount: _pendingKnowledge.length,
+              itemBuilder: (context, index) {
+                final knowledge = _pendingKnowledge[index];
+                return Card(
+                  margin: const EdgeInsets.all(8.0),
+                  child: ListTile(
+                    title: Text(knowledge.name),
+                    subtitle: Text('作者: ${knowledge.authorName}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.check, color: Colors.green),
+                          onPressed: () => _approveKnowledge(knowledge.id),
+                          tooltip: '通过',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          onPressed: () => _rejectKnowledge(knowledge.id),
+                          tooltip: '拒绝',
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        '/knowledge_detail',
+                        arguments: {'knowledgeId': knowledge.id},
+                      );
+                    },
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.red),
-                    onPressed: () => _rejectKnowledge(knowledge.id),
-                    tooltip: '拒绝',
-                  ),
-                ],
-              ),
-              onTap: () {
-                Navigator.pushNamed(
-                  context,
-                  '/knowledge_detail',
-                  arguments: {'knowledgeId': knowledge.id},
                 );
               },
             ),
-          );
-        },
+          ),
+          if (_knowledgeTotal > 0)
+            PaginationWidget(
+              currentPage: _knowledgeCurrentPage,
+              totalPages: (_knowledgeTotal / _knowledgePageSize).ceil().clamp(1, double.infinity).toInt(),
+              total: _knowledgeTotal,
+              pageSize: _knowledgePageSize,
+              onPageChanged: _onKnowledgePageChanged,
+            ),
+        ],
       ),
     );
   }
@@ -283,41 +322,55 @@ class _ReviewTabContentState extends State<ReviewTabContent>
     }
 
     return RefreshIndicator(
-      onRefresh: _loadPendingItems,
-      child: ListView.builder(
-        itemCount: _pendingPersonas.length,
-        itemBuilder: (context, index) {
-          final persona = _pendingPersonas[index];
-          return Card(
-            margin: const EdgeInsets.all(8.0),
-            child: ListTile(
-              title: Text(persona.name),
-              subtitle: Text('作者: ${persona.authorName}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.check, color: Colors.green),
-                    onPressed: () => _approvePersona(persona.id),
-                    tooltip: '通过',
+      onRefresh: () => _loadPendingItems(),
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              itemCount: _pendingPersonas.length,
+              itemBuilder: (context, index) {
+                final persona = _pendingPersonas[index];
+                return Card(
+                  margin: const EdgeInsets.all(8.0),
+                  child: ListTile(
+                    title: Text(persona.name),
+                    subtitle: Text('作者: ${persona.authorName}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.check, color: Colors.green),
+                          onPressed: () => _approvePersona(persona.id),
+                          tooltip: '通过',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          onPressed: () => _rejectPersona(persona.id),
+                          tooltip: '拒绝',
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        '/persona_detail',
+                        arguments: {'personaId': persona.id},
+                      );
+                    },
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.red),
-                    onPressed: () => _rejectPersona(persona.id),
-                    tooltip: '拒绝',
-                  ),
-                ],
-              ),
-              onTap: () {
-                Navigator.pushNamed(
-                  context,
-                  '/persona_detail',
-                  arguments: {'personaId': persona.id},
                 );
               },
             ),
-          );
-        },
+          ),
+          if (_personaTotal > 0)
+            PaginationWidget(
+              currentPage: _personaCurrentPage,
+              totalPages: (_personaTotal / _personaPageSize).ceil().clamp(1, double.infinity).toInt(),
+              total: _personaTotal,
+              pageSize: _personaPageSize,
+              onPageChanged: _onPersonaPageChanged,
+            ),
+        ],
       ),
     );
   }

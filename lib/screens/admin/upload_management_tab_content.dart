@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:file_picker/file_picker.dart';
+import 'package:dio/dio.dart';
 import '../../services/api_service.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../constants/app_constants.dart';
@@ -116,16 +118,116 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
   Future<void> _loadUploadHistory() async {
     try {
       final apiService = ApiService();
-      final response = await apiService.get('/api/admin/upload-history');
+      final response = await apiService.get('/api/admin/upload-history?page=1&limit=20');
       final data = response.data;
-
+      
+      // 添加调试日志
+      debugPrint('Upload history API response: $data');
+      
       if (data['success'] == true) {
-        setState(() {
-          _uploadHistory = List<Map<String, dynamic>>.from(data['data'] ?? []);
-        });
+        final responseData = data['data'];
+        
+        // 检查是否包含错误信息（权限错误等）
+        if (responseData is Map && responseData.containsKey('detail')) {
+          // 这是错误信息，不是数据
+          debugPrint('API returned error: ${responseData['detail']}');
+          if (mounted) {
+            setState(() {
+              _uploadHistory = [];
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('权限错误: ${responseData['detail']}'),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+          return; // 不继续处理
+        }
+        
+        // 检查 data['data'] 的类型，确保它是 List
+        final dataList = responseData;
+        if (dataList is List) {
+          setState(() {
+            _uploadHistory = List<Map<String, dynamic>>.from(
+              dataList.map((item) {
+                final map = item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item);
+                // 确保字段名正确，兼容后端返回的字段
+                return {
+                  'id': map['id'] ?? map['_id'],
+                  'fileName': map['fileName'] ?? map['name'] ?? '未知文件',
+                  'fileType': map['fileType'] ?? map['type'] ?? 'unknown',
+                  'fileSize': map['fileSize'] ?? 0,
+                  'uploaderName': map['uploaderName'] ?? map['uploader']?['username'] ?? '未知用户',
+                  'uploadedAt': map['uploadedAt'] ?? map['created_at'] ?? map['createdAt'],
+                  'status': map['status'] ?? 'unknown',
+                  'errorMessage': map['errorMessage'] ?? map['error_message'],
+                };
+              })
+            );
+          });
+          debugPrint('Upload history loaded successfully: ${_uploadHistory.length} records');
+          if (_uploadHistory.isNotEmpty) {
+            debugPrint('First record: ${_uploadHistory.first}');
+          }
+        } else if (dataList is Map) {
+          // 如果返回的是 Map，可能是单个对象，转换为列表
+          debugPrint('Warning: API returned Map instead of List, converting to List');
+          final map = Map<String, dynamic>.from(dataList);
+          setState(() {
+            _uploadHistory = [{
+              'id': map['id'] ?? map['_id'],
+              'fileName': map['fileName'] ?? map['name'] ?? '未知文件',
+              'fileType': map['fileType'] ?? map['type'] ?? 'unknown',
+              'fileSize': map['fileSize'] ?? 0,
+              'uploaderName': map['uploaderName'] ?? map['uploader']?['username'] ?? '未知用户',
+              'uploadedAt': map['uploadedAt'] ?? map['created_at'] ?? map['createdAt'],
+              'status': map['status'] ?? 'unknown',
+              'errorMessage': map['errorMessage'] ?? map['error_message'],
+            }];
+          });
+          debugPrint('Upload history loaded (converted from Map): ${_uploadHistory.length} records');
+        } else {
+          // 如果既不是 List 也不是 Map，设置为空列表
+          debugPrint('Warning: API returned unexpected data type: ${dataList.runtimeType}');
+          setState(() {
+            _uploadHistory = [];
+          });
+        }
+      } else {
+        // 处理API返回失败的情况
+        debugPrint('API returned success=false: ${data['message'] ?? 'Unknown error'}');
+        if (mounted) {
+          setState(() {
+            _uploadHistory = [];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('获取上传历史失败: ${data['message'] ?? '未知错误'}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
-    } catch (e) {
-      // 静默处理错误
+    } catch (e, stackTrace) {
+      // 不再静默处理，显示错误信息并添加调试日志
+      debugPrint('Error loading upload history: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _uploadHistory = [];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载上传历史失败: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            action: SnackBarAction(
+              label: '重试',
+              onPressed: _loadUploadHistory,
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -134,14 +236,69 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
       final apiService = ApiService();
       final response = await apiService.get('/api/admin/upload-stats');
       final data = response.data;
-
+      
+      // 添加调试日志
+      debugPrint('Upload stats API response: $data');
+      
       if (data['success'] == true) {
+        final responseData = data['data'];
+        
+        // 检查是否包含错误信息（权限错误等）
+        if (responseData is Map && responseData.containsKey('detail')) {
+          // 这是错误信息，不是数据
+          debugPrint('API returned error: ${responseData['detail']}');
+          if (mounted) {
+            setState(() {
+              _uploadStats = {};
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('权限错误: ${responseData['detail']}'),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+          return; // 不继续处理
+        }
+        
         setState(() {
-          _uploadStats = data['data'];
+          _uploadStats = responseData ?? {};
         });
+        debugPrint('Upload stats loaded successfully: $_uploadStats');
+      } else {
+        // 处理API返回失败的情况
+        debugPrint('API returned success=false: ${data['message'] ?? 'Unknown error'}');
+        if (mounted) {
+          setState(() {
+            _uploadStats = {};
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('获取上传统计失败: ${data['message'] ?? '未知错误'}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
-    } catch (e) {
-      // 静默处理错误
+    } catch (e, stackTrace) {
+      // 不再静默处理，显示错误信息并添加调试日志
+      debugPrint('Error loading upload stats: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _uploadStats = {};
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载上传统计失败: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            action: SnackBarAction(
+              label: '重试',
+              onPressed: _loadUploadStats,
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -256,9 +413,6 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
         });
       }
 
-      // 获取文件路径
-      final filePaths = _knowledgeFiles.map((file) => file.path!).toList();
-
       // 解析标签
       final tags = _knowledgeTagsController.text
           .split(',')
@@ -266,16 +420,53 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
           .where((tag) => tag.isNotEmpty)
           .toList();
 
+      // 创建元数据
+      final metadata = {
+        'name': _knowledgeNameController.text.trim(),
+        'description': _knowledgeDescriptionController.text.trim(),
+        'content': _knowledgeCopyrightController.text.trim(),
+        'tags': tags.join(','),
+        'isPublic': 'false',
+      };
+
+      // 准备文件上传
+      final formData = FormData();
+
+      // 添加元数据
+      formData.fields.addAll(
+        metadata.entries.map((e) => MapEntry(e.key, e.value.toString())),
+      );
+
+      // 添加文件
+      for (var file in _knowledgeFiles) {
+        MultipartFile multipartFile;
+        if (kIsWeb) {
+          // Web 平台使用 bytes
+          if (file.bytes == null) {
+            throw Exception('文件数据不可用');
+          }
+          multipartFile = MultipartFile.fromBytes(
+            file.bytes!,
+            filename: file.name,
+          );
+        } else {
+          // 其他平台使用 path
+          if (file.path == null) {
+            throw Exception('文件路径不可用');
+          }
+          multipartFile = MultipartFile.fromFileSync(
+            file.path!,
+            filename: file.name,
+          );
+        }
+        formData.files.add(
+          MapEntry('files', multipartFile),
+        );
+      }
+
       // 调用API上传知识库
       final apiService = ApiService();
-      await apiService.uploadKnowledge(
-        name: _knowledgeNameController.text.trim(),
-        description: _knowledgeDescriptionController.text.trim(),
-        filePaths: filePaths,
-        content: _knowledgeCopyrightController.text.trim(),
-        tags: tags,
-        isPublic: false,
-      );
+      await apiService.upload('/api/knowledge/upload', formData);
 
       // 完成上传
       setState(() {
@@ -362,9 +553,6 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
         });
       }
 
-      // 获取文件路径
-      final filePaths = _personaFiles.map((file) => file.path!).toList();
-
       // 解析标签
       final tags = _personaTagsController.text
           .split(',')
@@ -372,16 +560,53 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
           .where((tag) => tag.isNotEmpty)
           .toList();
 
+      // 创建元数据
+      final metadata = {
+        'name': _personaNameController.text.trim(),
+        'description': _personaDescriptionController.text.trim(),
+        'content': _personaAuthorController.text.trim(),
+        'tags': tags.join(','),
+        'isPublic': 'false',
+      };
+
+      // 准备文件上传
+      final formData = FormData();
+
+      // 添加元数据
+      formData.fields.addAll(
+        metadata.entries.map((e) => MapEntry(e.key, e.value.toString())),
+      );
+
+      // 添加文件
+      for (var file in _personaFiles) {
+        MultipartFile multipartFile;
+        if (kIsWeb) {
+          // Web 平台使用 bytes
+          if (file.bytes == null) {
+            throw Exception('文件数据不可用');
+          }
+          multipartFile = MultipartFile.fromBytes(
+            file.bytes!,
+            filename: file.name,
+          );
+        } else {
+          // 其他平台使用 path
+          if (file.path == null) {
+            throw Exception('文件路径不可用');
+          }
+          multipartFile = MultipartFile.fromFileSync(
+            file.path!,
+            filename: file.name,
+          );
+        }
+        formData.files.add(
+          MapEntry('files', multipartFile),
+        );
+      }
+
       // 调用API上传人设卡
       final apiService = ApiService();
-      await apiService.uploadPersona(
-        name: _personaNameController.text.trim(),
-        description: _personaDescriptionController.text.trim(),
-        content: _personaAuthorController.text.trim(),
-        filePaths: filePaths,
-        tags: tags,
-        isPublic: false,
-      );
+      await apiService.upload('/api/persona/upload', formData);
 
       // 完成上传
       setState(() {
@@ -740,7 +965,6 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
       final apiService = ApiService();
       final response = await apiService.delete('/api/admin/uploads/$id');
       final data = response.data;
-
       if (data['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -765,7 +989,6 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
         data: {},
       );
       final data = response.data;
-
       if (data['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -922,6 +1145,16 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
   Widget _buildUploadStatsCards() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // 根据屏幕宽度动态调整列数
+    final crossAxisCount = screenWidth > 1200
+        ? 4
+        : screenWidth > 800
+            ? 3
+            : screenWidth > 600
+                ? 2
+                : 1;
 
     final stats = [
       {
@@ -955,8 +1188,8 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
       child: GridView.count(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 4,
-        childAspectRatio: 1.5,
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: crossAxisCount == 1 ? 3.0 : 1.5,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
         children: stats.map((stat) {
@@ -1135,7 +1368,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      _formatFileSize(upload['fileSize']),
+                      _formatFileSize(upload['fileSize'] is int ? upload['fileSize'] as int? : (upload['fileSize'] is num ? (upload['fileSize'] as num).toInt() : null)),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
@@ -1224,9 +1457,19 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (status == 'failed') ...[
+              // 只有失败状态、目标存在且有文件时，才显示重新处理按钮
+              if (status == 'failed' && 
+                  (upload['target_exists'] ?? true) && 
+                  (upload['has_files'] ?? true)) ...[
                 TextButton.icon(
-                  onPressed: () => _reprocessUpload(upload['_id']),
+                  onPressed: () {
+                    final id = upload['id'] ?? upload['_id'];
+                    if (id != null && id is String) {
+                      _reprocessUpload(id);
+                    } else {
+                      _showError('无法获取上传记录ID');
+                    }
+                  },
                   icon: const Icon(Icons.refresh, size: 16),
                   label: const Text('重新处理'),
                   style: TextButton.styleFrom(
@@ -1236,7 +1479,14 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
                 const SizedBox(width: 8),
               ],
               TextButton.icon(
-                onPressed: () => _deleteUpload(upload['_id']),
+                onPressed: () {
+                  final id = upload['id'] ?? upload['_id'];
+                  if (id != null && id is String) {
+                    _deleteUpload(id);
+                  } else {
+                    _showError('无法获取上传记录ID');
+                  }
+                },
                 icon: const Icon(Icons.delete, size: 16),
                 label: const Text('删除'),
                 style: TextButton.styleFrom(foregroundColor: colorScheme.error),
@@ -1340,4 +1590,4 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
     }
   }
 }
-
+

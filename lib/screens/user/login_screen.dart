@@ -70,6 +70,8 @@ class _LoginScreenState extends State<LoginScreen> {
               label: '详情',
               textColor: Colors.white,
               onPressed: () {
+                // 检查widget是否仍然mounted
+                if (!mounted) return;
                 // 显示完整的错误信息对话框
                 showDialog(
                   context: context,
@@ -368,6 +370,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+
+                  // 注册链接
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('还没有账号？'),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/register');
+                        },
+                        child: const Text('立即注册'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
 
                   // 关于按钮
                   TextButton(

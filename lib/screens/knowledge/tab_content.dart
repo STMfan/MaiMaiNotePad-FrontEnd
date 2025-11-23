@@ -11,6 +11,7 @@ class KnowledgeTabContent extends StatelessWidget {
   final TextEditingController searchController;
   final Function(String) onSearch;
   final VoidCallback? onSwitchToUploadManagement;
+  final VoidCallback? onRefresh;
 
   const KnowledgeTabContent({
     super.key,
@@ -18,6 +19,7 @@ class KnowledgeTabContent extends StatelessWidget {
     required this.searchController,
     required this.onSearch,
     this.onSwitchToUploadManagement,
+    this.onRefresh,
   });
 
   @override
@@ -210,12 +212,16 @@ class KnowledgeTabContent extends StatelessWidget {
       elevation: 2,
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: () {
-          Navigator.pushNamed(
+        onTap: () async {
+          final result = await Navigator.pushNamed(
             context,
             AppRouter.knowledgeDetail,
-            arguments: knowledge.id,
+            arguments: {'knowledgeId': knowledge.id},
           );
+          // 如果返回 true，表示已删除，需要刷新列表
+          if (result == true && onRefresh != null) {
+            onRefresh!();
+          }
         },
         borderRadius: BorderRadius.circular(8),
         child: Padding(

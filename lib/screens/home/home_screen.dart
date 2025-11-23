@@ -6,6 +6,7 @@ import '../../providers/user_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/app_router.dart';
+import '../../services/api_service.dart';
 import '../admin/overview_tab_content.dart';
 import '../admin/upload_management_tab_content.dart';
 import '../admin/review_tab_content.dart';
@@ -41,6 +42,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   String _knowledgeSearchQuery = '';
   String _personaSearchQuery = '';
+  
+  // 未读消息数量
+  int _unreadMessageCount = 0;
 
   @override
   void initState() {
@@ -63,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // 加载数据
     _loadKnowledgeList();
     _loadPersonaList();
+    _loadUnreadMessageCount();
   }
 
   @override
@@ -75,19 +80,79 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _loadKnowledgeList() async {
-    // TODO: 实现知识库列表加载
-    setState(() {
-      _knowledgeList.clear();
-      _filteredKnowledgeList.clear();
-    });
+    try {
+      final apiService = ApiService();
+      final response = await apiService.getPublicKnowledge();
+      
+      setState(() {
+        _knowledgeList.clear();
+        _knowledgeList.addAll(response.items);
+        _filteredKnowledgeList.clear();
+        _filteredKnowledgeList.addAll(response.items);
+      });
+    } catch (e) {
+      // 静默处理错误，避免在未登录时显示错误提示
+      if (mounted) {
+        debugPrint('加载知识库列表失败: $e');
+        setState(() {
+          _knowledgeList.clear();
+          _filteredKnowledgeList.clear();
+        });
+      }
+    }
   }
 
   Future<void> _loadPersonaList() async {
-    // TODO: 实现人设卡列表加载
-    setState(() {
-      _personaList.clear();
-      _filteredPersonaList.clear();
-    });
+    try {
+      final apiService = ApiService();
+      final response = await apiService.getPublicPersonas();
+      
+      setState(() {
+        _personaList.clear();
+        _personaList.addAll(response.items);
+        _filteredPersonaList.clear();
+        _filteredPersonaList.addAll(response.items);
+      });
+    } catch (e) {
+      // 静默处理错误，避免在未登录时显示错误提示
+      if (mounted) {
+        debugPrint('加载人设卡列表失败: $e');
+        setState(() {
+          _personaList.clear();
+          _filteredPersonaList.clear();
+        });
+      }
+    }
+  }
+
+  Future<void> _loadUnreadMessageCount() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      if (!userProvider.isLoggedIn) {
+        setState(() {
+          _unreadMessageCount = 0;
+        });
+        return;
+      }
+
+      final apiService = ApiService();
+      final messages = await apiService.getUserMessages(page: 1, limit: 100);
+      final unreadCount = messages.where((msg) => msg['is_read'] == false).length;
+      
+      if (mounted) {
+        setState(() {
+          _unreadMessageCount = unreadCount;
+        });
+      }
+    } catch (e) {
+      // 静默处理错误
+      if (mounted) {
+        debugPrint('加载未读消息数量失败: $e');
+        setState(() {
+          _unreadMessageCount = 0;
+        });
+      }
+    }
   }
 
   void _searchKnowledge(String query) {
@@ -137,16 +202,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // 切换到上传管理tab
   void _switchToUploadManagementTab() {
-    // 计算上传管理tab的索引
-    int uploadManagementIndex = 4; // 知识库(0) + 人设卡(1) + 消息(2) + 个人资料(3) = 4
     final userProvider = Provider.of<UserProvider>(context, listen: false);
+    // 计算上传管理tab的索引
+    // basePages: 知识库(0) + 人设卡(1) + 消息(2) + 个人资料(3) = 4
+    int uploadManagementIndex = 4; // 从basePages之后开始
+    
+    // 审核员和管理员都有审核管理页面
     if (userProvider.currentUser?.isAdminOrModerator == true) {
       uploadManagementIndex += 1; // 审核管理
     }
+    // 只有管理员有管理员概览页面
     if (userProvider.currentUser?.role == 'admin') {
       uploadManagementIndex += 1; // 管理员概览
     }
-    // 现在的uploadManagementIndex就是上传管理的索引
+    // 现在的uploadManagementIndex就是上传管理的索引（上传管理在最后）
 
     setState(() {
       _currentIndex = uploadManagementIndex;
@@ -164,6 +233,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         searchController: _knowledgeSearchController,
         onSearch: _searchKnowledge,
         onSwitchToUploadManagement: _switchToUploadManagementTab,
+        onRefresh: () {
+          // 刷新知识库列表
+          _loadKnowledgeList();
+        },
       ),
       PersonaTabContent(
         personaList: _filteredPersonaList.isEmpty && _personaSearchQuery.isEmpty
@@ -172,8 +245,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         searchController: _personaSearchController,
         onSearch: _searchPersona,
         onSwitchToUploadManagement: _switchToUploadManagementTab,
+        onRefresh: () async {
+          // 刷新人设卡列表
+          await _loadPersonaList();
+          // 如果当前有搜索查询，重新应用搜索过滤
+          if (_personaSearchQuery.isNotEmpty) {
+            _searchPersona(_personaSearchQuery);
+          }
+        },
       ),
       MessageTabContent(),
+      // 个人资料页面保留在页面列表中，但不在侧边栏显示
       ProfileTabContent(),
     ];
 
@@ -199,9 +281,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildMainContent(UserProvider userProvider) {
     final pages = _buildPages(userProvider);
+    // 确保索引在有效范围内，防止越界错误
+    final safeIndex = _currentIndex >= 0 && _currentIndex < pages.length 
+        ? _currentIndex 
+        : 0;
+    // 如果索引无效，重置为0
+    if (safeIndex != _currentIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _currentIndex = 0;
+          });
+        }
+      });
+    }
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
-      child: pages[_currentIndex],
+      child: pages[safeIndex],
     );
   }
 
@@ -296,22 +392,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         children: [
                           _buildNavItem(Icons.library_books, '知识库', 0),
                           _buildNavItem(Icons.person, '人设卡', 1),
-                          _buildNavItem(Icons.message, '消息', 2),
-                          _buildNavItem(Icons.account_circle, '个人资料', 3),
+                          // 消息入口已移至右上角通知铃铛，此处隐藏
+                          // _buildNavItem(Icons.message, '消息', 2),
+                          // 个人资料已移至右上角用户菜单
                           if (userProvider.currentUser?.isAdminOrModerator ==
                               true) ...[
-                            _buildNavItem(Icons.verified, '审核管理', 4),
+                            _buildNavItem(Icons.verified, '审核管理', 2),
                           ],
                           if (userProvider.currentUser?.role == 'admin') ...[
                             _buildNavItem(
                               Icons.admin_panel_settings,
                               '管理员概览',
-                              5,
+                              3,
                             ),
                           ],
                           if (userProvider.currentUser?.isAdminOrModerator ==
                               true) ...[
-                            _buildNavItem(Icons.cloud_upload, '上传管理', 6),
+                            _buildNavItem(Icons.cloud_upload, '上传管理', 4),
                           ],
                         ],
                       ),
@@ -368,45 +465,131 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 },
                               ),
                               const SizedBox(width: 8),
-                              // 通知图标
-                              IconButton(
-                                icon: const Icon(Icons.notifications),
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('通知功能开发中')),
-                                  );
-                                },
+                              // 通知图标（带未读消息提示）
+                              Stack(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.notifications),
+                                    onPressed: () {
+                                      setState(() {
+                                        _currentIndex = 2; // 跳转到消息页面
+                                      });
+                                      // 刷新未读消息数量
+                                      _loadUnreadMessageCount();
+                                    },
+                                    tooltip: '消息通知',
+                                  ),
+                                  if (_unreadMessageCount > 0)
+                                    Positioned(
+                                      right: 8,
+                                      top: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 16,
+                                          minHeight: 16,
+                                        ),
+                                        child: Text(
+                                          _unreadMessageCount > 99 ? '99+' : '$_unreadMessageCount',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                               const SizedBox(width: 8),
-                              // 用户头像
-                              CircleAvatar(
-                                radius: isLargeScreen ? 16 : 14,
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary,
-                                child: Text(
-                                  userProvider.currentUser?.name.substring(
-                                        0,
-                                        1,
-                                      ) ??
-                                      'U',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: isLargeScreen ? 14 : 12,
-                                    fontWeight: FontWeight.bold,
+                              // 用户菜单（头像+用户名）
+                              PopupMenuButton<String>(
+                                offset: const Offset(0, 50),
+                                child: InkWell(
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: isLargeScreen ? 16 : 14,
+                                        backgroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                        child: Text(
+                                          userProvider.currentUser?.name.substring(
+                                                0,
+                                                1,
+                                              ) ??
+                                              'U',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: isLargeScreen ? 14 : 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      // 用户名（仅在大屏幕显示）
+                                      if (isLargeScreen)
+                                        Text(
+                                          userProvider.currentUser?.name ?? '用户',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.arrow_drop_down,
+                                        size: isLargeScreen ? 20 : 18,
+                                      ),
+                                    ],
                                   ),
                                 ),
+                                onSelected: (value) {
+                                  if (value == 'profile') {
+                                    // 切换到个人资料标签页（索引3）
+                                    setState(() {
+                                      _currentIndex = 3;
+                                    });
+                                  } else if (value == 'logout') {
+                                    // 登出
+                                    userProvider.logout();
+                                    // 不需要提示，直接跳转
+                                    Navigator.pushNamedAndRemoveUntil(
+                                      context,
+                                      AppRouter.login,
+                                      (route) => false,
+                                    );
+                                  }
+                                },
+                                itemBuilder: (BuildContext context) => [
+                                  const PopupMenuItem<String>(
+                                    value: 'profile',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.account_circle, size: 20),
+                                        SizedBox(width: 8),
+                                        Text('个人资料'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuDivider(),
+                                  const PopupMenuItem<String>(
+                                    value: 'logout',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.logout, size: 20, color: Colors.red),
+                                        SizedBox(width: 8),
+                                        Text('登出', style: TextStyle(color: Colors.red)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 6),
-                              // 用户名（仅在大屏幕显示）
-                              if (isLargeScreen)
-                                Text(
-                                  userProvider.currentUser?.name ?? '用户',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
                             ] else ...[
                               // 登录按钮
                               ElevatedButton(
@@ -448,13 +631,60 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // 将实际页面索引转换为导航索引
+  // 导航索引（固定）：知识库(0), 人设卡(1), 审核管理(2), 管理员概览(3), 上传管理(4)
+  // 实际页面索引（动态）：知识库(0), 人设卡(1), 消息(2), 个人资料(3), 然后根据权限添加管理页面
+  int _getNavIndexFromPageIndex(int pageIndex, UserProvider userProvider) {
+    // 基础页面（0-1）直接对应
+    if (pageIndex <= 1) {
+      return pageIndex;
+    }
+    
+    // 消息(2)和个人资料(3)不在侧边栏显示
+    if (pageIndex == 2 || pageIndex == 3) {
+      return -1;
+    }
+    
+    // 从索引4开始是管理页面，需要根据用户权限和页面顺序来确定导航索引
+    // 页面顺序（动态）：审核管理(4) -> 管理员概览(5) -> 上传管理(6)
+    // 导航索引（固定）：审核管理(2), 管理员概览(3), 上传管理(4)
+    int currentPageIndex = 4;
+    
+    // 审核管理（管理员和审核员可见，页面索引4，导航索引2）
+    if (userProvider.currentUser?.isAdminOrModerator == true) {
+      if (pageIndex == currentPageIndex) {
+        return 2; // 导航索引固定为2
+      }
+      currentPageIndex++;
+    }
+    
+    // 管理员概览（仅管理员可见，页面索引5，导航索引3）
+    if (userProvider.currentUser?.role == 'admin') {
+      if (pageIndex == currentPageIndex) {
+        return 3; // 导航索引固定为3
+      }
+      currentPageIndex++;
+    }
+    
+    // 上传管理（管理员和审核员可见，页面索引6，导航索引4）
+    if (userProvider.currentUser?.isAdminOrModerator == true) {
+      if (pageIndex == currentPageIndex) {
+        return 4; // 导航索引固定为4
+      }
+    }
+    
+    return -1; // 未找到匹配的导航索引
+  }
+
   // 导航项构建器 - 响应式设计
   Widget _buildNavItem(IconData icon, String title, int index) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         final screenWidth = MediaQuery.of(context).size.width;
         final isLargeScreen = screenWidth >= 1200;
-        final isSelected = _currentIndex == index;
+        // 将实际页面索引转换为导航索引进行比较
+        final navIndex = _getNavIndexFromPageIndex(_currentIndex, userProvider);
+        final isSelected = navIndex == index;
 
         return Container(
           margin: EdgeInsets.symmetric(
@@ -496,7 +726,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 return;
               }
 
-              // 审核管理权限检查
+              // 计算实际页面索引
+              // 导航索引（侧边栏）：知识库(0), 人设卡(1), 审核管理(2), 管理员概览(3), 上传管理(4)
+              // 实际页面索引：知识库(0), 人设卡(1), 消息(2), 个人资料(3), 审核管理(4), 管理员概览(5), 上传管理(6)
+              int actualIndex = index;
+              
+              // 基础页面（0-1）直接对应
+              if (index <= 1) {
+                actualIndex = index;
+              } else {
+                // 管理页面从索引4开始（basePages有4个：知识库、人设卡、消息、个人资料）
+                actualIndex = 4; // basePages之后开始
+                
+                // 审核管理（导航索引2，实际页面索引4）
+                if (index == 2) {
+                  actualIndex = 4;
+                }
+                // 管理员概览（导航索引3，实际页面索引5）
+                else if (index == 3) {
+                  // 需要先加上审核管理页面（如果用户是审核员或管理员）
+                  if (userProvider.currentUser?.isAdminOrModerator == true) {
+                    actualIndex = 5;
+                  }
+                }
+                // 上传管理（导航索引4）
+                else if (index == 4) {
+                  // 基础索引4（basePages之后）
+                  actualIndex = 4;
+                  // 加上审核管理页面（如果用户是审核员或管理员）
+                  if (userProvider.currentUser?.isAdminOrModerator == true) {
+                    actualIndex += 1; // 审核管理
+                  }
+                  // 加上管理员概览页面（如果用户是管理员）
+                  if (userProvider.currentUser?.role == 'admin') {
+                    actualIndex += 1; // 管理员概览
+                  }
+                  // 现在actualIndex就是上传管理的索引
+                }
+              }
+              
+              // 审核管理权限检查（导航索引2，实际页面索引4）
+              if (index == 2 &&
+                  userProvider.currentUser?.isAdminOrModerator != true) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('需要管理员或审核员权限')));
+                return;
+              }
+
+              // 管理员权限检查（导航索引3，实际页面索引5）
+              if (index == 3 && userProvider.currentUser?.role != 'admin') {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('需要管理员权限')));
+                return;
+              }
+
+              // 上传管理权限检查（导航索引4，实际页面索引6）
               if (index == 4 &&
                   userProvider.currentUser?.isAdminOrModerator != true) {
                 ScaffoldMessenger.of(
@@ -505,26 +791,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 return;
               }
 
-              // 管理员权限检查
-              if (index == 5 && userProvider.currentUser?.role != 'admin') {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('需要管理员权限')));
-                return;
-              }
-
-              // 上传管理权限检查
-              if (index == 6 &&
-                  userProvider.currentUser?.isAdminOrModerator != true) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('需要管理员或审核员权限')));
-                return;
-              }
-
               setState(() {
-                _currentIndex = index;
+                _currentIndex = actualIndex;
               });
+              
+              // 如果切换到消息页面，刷新未读消息数量
+              if (actualIndex == 2) {
+                _loadUnreadMessageCount();
+              }
             },
           ),
         );
@@ -534,27 +808,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // 获取页面标题
   String _getPageTitle(int index, UserProvider userProvider) {
-    switch (index) {
-      case 0:
-        return '知识库';
-      case 1:
-        return '人设卡';
-      case 2:
-        return '消息';
-      case 3:
-        return '个人资料';
-      case 4:
-        return userProvider.currentUser?.isAdminOrModerator == true
-            ? '审核管理'
-            : '首页';
-      case 5:
-        return userProvider.currentUser?.role == 'admin' ? '管理员概览' : '首页';
-      case 6:
-        return userProvider.currentUser?.isAdminOrModerator == true
-            ? '上传管理'
-            : '首页';
-      default:
-        return '首页';
+    // 基础页面：知识库(0), 人设卡(1), 消息(2), 个人资料(3)
+    if (index < 4) {
+      switch (index) {
+        case 0:
+          return '知识库';
+        case 1:
+          return '人设卡';
+        case 2:
+          return '消息';
+        case 3:
+          return '个人资料';
+        default:
+          return '首页';
+      }
     }
+    
+    int currentIndex = 4;
+    
+    // 审核管理（管理员和审核员可见）
+    if (userProvider.currentUser?.isAdminOrModerator == true) {
+      if (index == currentIndex) {
+        return '审核管理';
+      }
+      currentIndex++;
+    }
+    
+    // 管理员概览（仅管理员可见）
+    if (userProvider.currentUser?.role == 'admin') {
+      if (index == currentIndex) {
+        return '管理员概览';
+      }
+      currentIndex++;
+    }
+    
+    // 上传管理（管理员和审核员可见）
+    if (userProvider.currentUser?.isAdminOrModerator == true) {
+      if (index == currentIndex) {
+        return '上传管理';
+      }
+    }
+    
+    return '首页';
   }
 }

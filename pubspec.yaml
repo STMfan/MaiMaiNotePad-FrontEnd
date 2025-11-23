@@ -41,6 +41,9 @@ dependencies:
   intl: ^0.19.0
   url_launcher: ^6.2.2
   animations: ^2.1.0
+  
+  # Markdown支持
+  flutter_markdown: ^0.6.18
 
 dev_dependencies:
   flutter_test:

@@ -5,11 +5,18 @@ part 'user.g.dart';
 @JsonSerializable()
 class User {
   final String id;
+  @JsonKey(name: 'username')
   final String name;
   final String? email;
   final String role;
+  @JsonKey(name: 'created_at')
   final DateTime? createdAt;
+  @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
+  @JsonKey(name: 'avatar_url')
+  final String? avatarUrl;
+  @JsonKey(name: 'avatar_updated_at')
+  final DateTime? avatarUpdatedAt;
 
   User({
     required this.id,
@@ -18,6 +25,8 @@ class User {
     required this.role,
     this.createdAt,
     this.updatedAt,
+    this.avatarUrl,
+    this.avatarUpdatedAt,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -32,11 +41,19 @@ class User {
         email: json['email']?.toString(),
         role:
             json['role']?.toString() ?? json['user_role']?.toString() ?? 'user',
-        createdAt: json['createdAt'] != null
-            ? DateTime.tryParse(json['createdAt'].toString())
-            : null,
-        updatedAt: json['updatedAt'] != null
-            ? DateTime.tryParse(json['updatedAt'].toString())
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'].toString())
+            : (json['createdAt'] != null
+                ? DateTime.tryParse(json['createdAt'].toString())
+                : null),
+        updatedAt: json['updated_at'] != null
+            ? DateTime.tryParse(json['updated_at'].toString())
+            : (json['updatedAt'] != null
+                ? DateTime.tryParse(json['updatedAt'].toString())
+                : null),
+        avatarUrl: json['avatar_url']?.toString(),
+        avatarUpdatedAt: json['avatar_updated_at'] != null
+            ? DateTime.tryParse(json['avatar_updated_at'].toString())
             : null,
       );
     }

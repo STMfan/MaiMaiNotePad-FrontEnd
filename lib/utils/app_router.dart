@@ -11,6 +11,7 @@ import '../models/knowledge.dart';
 class AppRouter {
   static const String home = '/';
   static const String login = '/login';
+  static const String register = '/register';
   static const String knowledge = '/knowledge';
   static const String persona = '/persona';
   static const String message = '/message';
@@ -18,6 +19,7 @@ class AppRouter {
   static const String settings = '/settings';
   static const String knowledgeDetail = '/knowledge_detail';
   static const String personaDetail = '/persona_detail';
+  static const String messageDetail = '/message_detail';
   static const String upload = '/upload';
   static const String editKnowledge = '/editKnowledge';
 
@@ -58,6 +60,8 @@ class AppRouter {
         return _createRoute(const HomeScreen(), settings);
       case login:
         return _createRoute(const LoginScreen(), settings);
+      case register:
+        return _createRoute(const RegisterScreen(), settings);
       case knowledge:
         return _createRoute(const KnowledgeScreen(), settings);
       case persona:
@@ -66,6 +70,8 @@ class AppRouter {
         return _createRoute(const MessageScreen(), settings);
       case about:
         return _createRoute(const AboutScreen(), settings);
+      case AppRouter.settings:
+        return _createRoute(const SettingsScreen(), settings);
       case '/stars':
         return _createRoute(const StarsScreen(), settings);
       case knowledgeDetail:
@@ -76,10 +82,25 @@ class AppRouter {
           settings,
         );
       case personaDetail:
-        final args = settings.arguments as Map<String, dynamic>?;
-        final personaId = args?['personaId'] as String?;
+        String personaId = '';
+        if (settings.arguments != null) {
+          if (settings.arguments is Map<String, dynamic>) {
+            final args = settings.arguments as Map<String, dynamic>;
+            personaId = args['personaId'] as String? ?? '';
+          } else if (settings.arguments is String) {
+            // 兼容直接传递字符串的情况
+            personaId = settings.arguments as String;
+          }
+        }
         return _createRoute(
-          PersonaDetailScreen(personaId: personaId ?? ''),
+          PersonaDetailScreen(personaId: personaId),
+          settings,
+        );
+      case messageDetail:
+        final args = settings.arguments as Map<String, dynamic>?;
+        final messageId = args?['messageId'] as String?;
+        return _createRoute(
+          MessageDetailScreen(messageId: messageId ?? ''),
           settings,
         );
       // Upload路由已删除，统一上传功能通过管理页面提供

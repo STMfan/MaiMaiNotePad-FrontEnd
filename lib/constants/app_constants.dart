@@ -4,8 +4,11 @@ class AppConstants {
   static const String appShortName = 'MaiMNP';
   static const String appVersion = '1.0.0';
 
-  // API配置
-  static const String apiBaseUrl = 'http://localhost:9278';
+  // API配置 - 使用编译时定义，默认值为生产环境
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:9278',
+  );
   static const String apiBaseUrlKey = 'api_base_url';
 
   // 本地存储键
@@ -13,6 +16,7 @@ class AppConstants {
   static const String userIdKey = 'user_id';
   static const String userNameKey = 'user_name';
   static const String userRoleKey = 'user_role';
+  static const String userEmailKey = 'user_email';
 
   // 路由名称
   static const String loginRoute = '/login';

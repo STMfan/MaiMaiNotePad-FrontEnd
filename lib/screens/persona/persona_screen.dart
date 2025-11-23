@@ -81,28 +81,28 @@ class _PersonaScreenState extends State<PersonaScreen>
 
     try {
       final apiService = ApiService();
-      final response = await apiService.get('/api/persona/public');
-      final data = response.data;
-
-      if (data['success'] == true) {
-        setState(() {
-          _personaList = List<Map<String, dynamic>>.from(data['data'] ?? []);
-          _filteredPersonaList = _personaList;
-          _isSearching = false;
-        });
-      } else {
-        setState(() {
-          _isSearching = false;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(data['message'] ?? '加载人设卡失败'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
-      }
+      // 使用 getPublicPersonas 方法，它会正确处理后端返回的分页格式
+      final response = await apiService.getPublicPersonas();
+      
+      setState(() {
+        // 将 Persona 对象转换为 Map，以便在 UI 中使用
+        _personaList = response.items.map((persona) => {
+          'id': persona.id,
+          'name': persona.name,
+          'description': persona.description,
+          'author': persona.authorName,
+          'stars': persona.starCount > 0 ? persona.starCount : persona.stars,
+          'tags': persona.tags,
+          'created_at': persona.createdAt.toIso8601String(),
+          'updated_at': persona.updatedAt?.toIso8601String(),
+          'is_public': persona.isPublic,
+          'file_names': persona.fileNames,
+          'download_url': persona.downloadUrl,
+          'preview_url': persona.previewUrl,
+        }).toList();
+        _filteredPersonaList = _personaList;
+        _isSearching = false;
+      });
     } catch (e) {
       setState(() {
         _isSearching = false;
@@ -404,12 +404,16 @@ class _PersonaScreenState extends State<PersonaScreen>
           final persona = _filteredPersonaList[index];
           return PersonaCard(
             persona: persona,
-            onTap: () {
-              Navigator.pushNamed(
+            onTap: () async {
+              final result = await Navigator.pushNamed(
                 context,
                 AppRouter.personaDetail,
                 arguments: {'personaId': persona['id']},
               );
+              // 如果返回 true，表示已删除，需要刷新列表
+              if (result == true) {
+                _loadPersonaList();
+              }
             },
           );
         },
@@ -427,12 +431,16 @@ class _PersonaScreenState extends State<PersonaScreen>
           return PersonaCard(
             persona: persona,
             isListView: true,
-            onTap: () {
-              Navigator.pushNamed(
+            onTap: () async {
+              final result = await Navigator.pushNamed(
                 context,
                 AppRouter.personaDetail,
                 arguments: {'personaId': persona['id']},
               );
+              // 如果返回 true，表示已删除，需要刷新列表
+              if (result == true) {
+                _loadPersonaList();
+              }
             },
           );
         },

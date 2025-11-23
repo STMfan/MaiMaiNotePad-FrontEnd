@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import '../../models/knowledge.dart';
 import '../../services/api_service.dart';
@@ -59,7 +60,16 @@ class _EditKnowledgeScreenState extends State<EditKnowledgeScreen> {
 
       if (result != null) {
         setState(() {
-          _selectedFiles = result.paths.map((path) => path!).toList();
+          if (kIsWeb) {
+            // Web 平台：使用文件名作为标识
+            _selectedFiles = result.files.map((file) => file.name).toList();
+          } else {
+            // 其他平台：使用文件路径
+            _selectedFiles = result.paths
+                .where((path) => path != null)
+                .map((path) => path!)
+                .toList();
+          }
         });
       }
     } catch (e) {
@@ -90,14 +100,13 @@ class _EditKnowledgeScreenState extends State<EditKnowledgeScreen> {
     });
 
     try {
-      _updateTags();
-
       await ApiService().updateKnowledge(
         knowledgeId: widget.knowledge.id,
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim(),
-        tags: _tags,
-        isPublic: _isPublic,
+        copyrightOwner: _copyrightController.text.trim().isNotEmpty
+            ? _copyrightController.text.trim()
+            : null,
       );
 
       _showSuccess('知识库更新成功');
