@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# IDE / Flutter generated files
+/.metadata
+# Local analysis outputs
+analyze_result.txt
+final_analysis.txt
+final_result.txt
+# Temporary commit/message files
+COMMIT_MESSAGE.txt
+
