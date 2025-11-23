@@ -126,6 +126,85 @@ Authorization: Bearer {token}
 - `401`: 未授权访问
 - `500`: 获取用户信息失败
 
+### 修改密码
+修改当前用户的密码。
+
+```http
+PUT /api/users/me/password
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "current_password": "oldpass123",
+  "new_password": "newpass123",
+  "confirm_password": "newpass123"
+}
+```
+
+**参数说明**:
+- `current_password` (必填): 当前密码
+- `new_password` (必填): 新密码
+- `confirm_password` (必填): 确认新密码
+
+**响应示例**:
+```json
+{
+  "message": "密码修改成功"
+}
+```
+
+**错误响应**:
+- `400`: 当前密码错误、新密码格式不正确、两次输入的新密码不一致
+- `401`: 未授权访问
+- `500`: 修改密码失败
+
+### 上传头像
+上传当前用户的头像。
+
+```http
+POST /api/users/me/avatar
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+
+avatar: [文件]
+```
+
+**参数说明**:
+- `avatar` (必填): 头像文件
+
+**响应示例**:
+```json
+{
+  "message": "头像上传成功",
+  "avatar_url": "/api/users/user123/avatar"
+}
+```
+
+**错误响应**:
+- `400`: 文件格式不支持、文件大小超出限制
+- `401`: 未授权访问
+- `500`: 上传头像失败
+
+### 删除头像
+删除当前用户的头像。
+
+```http
+DELETE /api/users/me/avatar
+Authorization: Bearer {token}
+```
+
+**响应示例**:
+```json
+{
+  "message": "头像删除成功"
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `404`: 头像不存在
+- `500`: 删除头像失败
+
 ## 知识库管理接口
 
 ### 上传知识库
@@ -170,31 +249,45 @@ copyright_owner: 版权所有者（可选）
 - `500`: 上传知识库失败
 
 ### 获取公开知识库列表
-获取所有已审核通过的公开知识库列表。
+获取所有已审核通过的公开知识库列表，支持分页、搜索、筛选和排序。
 
 ```http
-GET /api/knowledge/public
+GET /api/knowledge/public?page=1&page_size=20&name=&uploader_id=&sort_by=created_at&sort_order=desc
 ```
+
+**查询参数说明**:
+- `page` (可选): 页码，从1开始，默认为1
+- `page_size` (可选): 每页数量，范围1-100，默认为20
+- `name` (可选): 按名称搜索，支持模糊匹配
+- `uploader_id` (可选): 按上传者ID筛选
+- `sort_by` (可选): 排序字段，可选值：`created_at`、`updated_at`、`star_count`，默认为 `created_at`
+- `sort_order` (可选): 排序顺序，可选值：`asc`、`desc`，默认为 `desc`
 
 **响应示例**:
 ```json
-[
-  {
-    "id": "kb123",
-    "name": "公开知识库",
-    "description": "这是一个公开的知识库",
-    "uploader_id": "user123",
-    "copyright_owner": "版权所有者",
-    "star_count": 10,
-    "is_public": true,
-    "is_pending": false,
-    "created_at": "2024-01-01T00:00:00",
-    "updated_at": "2024-01-01T00:00:00"
-  }
-]
+{
+  "items": [
+    {
+      "id": "kb123",
+      "name": "公开知识库",
+      "description": "这是一个公开的知识库",
+      "uploader_id": "user123",
+      "copyright_owner": "版权所有者",
+      "star_count": 10,
+      "is_public": true,
+      "is_pending": false,
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "page_size": 20
+}
 ```
 
 **错误响应**:
+- `400`: 查询参数无效（如page_size超出范围）
 - `500`: 获取公开知识库失败
 
 ### 获取知识库内容
@@ -311,6 +404,97 @@ Authorization: Bearer {token}
 - `401`: 未授权访问
 - `500`: 取消Star知识库失败
 
+### 检查知识库Star状态
+检查指定知识库是否已被当前用户Star。
+
+```http
+GET /api/knowledge/{kb_id}/starred
+Authorization: Bearer {token}
+```
+
+**参数说明**:
+- `kb_id` (路径参数): 知识库ID
+
+**响应示例**:
+```json
+{
+  "starred": true
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `404`: 知识库不存在
+- `500`: 检查Star状态失败
+
+### 更新知识库信息
+修改知识库的基本信息（名称、描述、版权所有者等）。
+
+```http
+PUT /api/knowledge/{kb_id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "name": "更新后的知识库名称",
+  "description": "更新后的描述",
+  "copyright_owner": "版权所有者"
+}
+```
+
+**参数说明**:
+- `kb_id` (路径参数): 知识库ID
+- `name` (可选): 知识库名称
+- `description` (可选): 知识库描述
+- `copyright_owner` (可选): 版权所有者
+
+**响应示例**:
+```json
+{
+  "id": "kb123",
+  "name": "更新后的知识库名称",
+  "description": "更新后的描述",
+  "uploader_id": "user123",
+  "copyright_owner": "版权所有者",
+  "star_count": 5,
+  "is_public": true,
+  "is_pending": false,
+  "created_at": "2024-01-01T00:00:00",
+  "updated_at": "2024-01-01T01:00:00"
+}
+```
+
+**错误响应**:
+- `400`: 没有提供要更新的字段
+- `401`: 未授权访问
+- `403`: 没有权限修改此知识库（只有上传者和管理员可以修改）
+- `404`: 知识库不存在
+- `500`: 修改知识库失败
+
+### 删除知识库
+删除整个知识库及其所有文件。
+
+```http
+DELETE /api/knowledge/{kb_id}
+Authorization: Bearer {token}
+```
+
+**参数说明**:
+- `kb_id` (路径参数): 知识库ID
+
+**响应示例**:
+```json
+{
+  "message": "知识库删除成功"
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限删除此知识库（只有上传者和管理员可以删除）
+- `404`: 知识库不存在
+- `500`: 删除知识库失败
+
 ## 人设卡管理接口
 
 ### 上传人设卡
@@ -355,31 +539,45 @@ copyright_owner: 版权所有者（可选）
 - `500`: 上传人设卡失败
 
 ### 获取公开人设卡列表
-获取所有已审核通过的公开人设卡列表。
+获取所有已审核通过的公开人设卡列表，支持分页、搜索、筛选和排序。
 
 ```http
-GET /api/persona/public
+GET /api/persona/public?page=1&page_size=20&name=&uploader_id=&sort_by=created_at&sort_order=desc
 ```
+
+**查询参数说明**:
+- `page` (可选): 页码，从1开始，默认为1
+- `page_size` (可选): 每页数量，范围1-100，默认为20
+- `name` (可选): 按名称搜索，支持模糊匹配
+- `uploader_id` (可选): 按上传者ID筛选
+- `sort_by` (可选): 排序字段，可选值：`created_at`、`updated_at`、`star_count`，默认为 `created_at`
+- `sort_order` (可选): 排序顺序，可选值：`asc`、`desc`，默认为 `desc`
 
 **响应示例**:
 ```json
-[
-  {
-    "id": "pc123",
-    "name": "公开人设卡",
-    "description": "这是一个公开的人设卡",
-    "uploader_id": "user123",
-    "copyright_owner": "版权所有者",
-    "star_count": 8,
-    "is_public": true,
-    "is_pending": false,
-    "created_at": "2024-01-01T00:00:00",
-    "updated_at": "2024-01-01T00:00:00"
-  }
-]
+{
+  "items": [
+    {
+      "id": "pc123",
+      "name": "公开人设卡",
+      "description": "这是一个公开的人设卡",
+      "uploader_id": "user123",
+      "copyright_owner": "版权所有者",
+      "star_count": 8,
+      "is_public": true,
+      "is_pending": false,
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    }
+  ],
+  "total": 50,
+  "page": 1,
+  "page_size": 20
+}
 ```
 
 **错误响应**:
+- `400`: 查询参数无效（如page_size超出范围）
 - `500`: 获取公开人设卡失败
 
 ### 获取人设卡内容
@@ -496,17 +694,111 @@ Authorization: Bearer {token}
 - `401`: 未授权访问
 - `500`: 取消Star人设卡失败
 
+### 检查人设卡Star状态
+检查指定人设卡是否已被当前用户Star。
+
+```http
+GET /api/persona/{pc_id}/starred
+Authorization: Bearer {token}
+```
+
+**参数说明**:
+- `pc_id` (路径参数): 人设卡ID
+
+**响应示例**:
+```json
+{
+  "starred": true
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `404`: 人设卡不存在
+- `500`: 检查Star状态失败
+
+### 更新人设卡信息
+修改人设卡的基本信息（名称、描述、版权所有者等）。
+
+```http
+PUT /api/persona/{pc_id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "name": "更新后的人设卡名称",
+  "description": "更新后的描述",
+  "copyright_owner": "版权所有者"
+}
+```
+
+**参数说明**:
+- `pc_id` (路径参数): 人设卡ID
+- `name` (可选): 人设卡名称
+- `description` (可选): 人设卡描述
+- `copyright_owner` (可选): 版权所有者
+
+**响应示例**:
+```json
+{
+  "id": "pc123",
+  "name": "更新后的人设卡名称",
+  "description": "更新后的描述",
+  "uploader_id": "user123",
+  "copyright_owner": "版权所有者",
+  "star_count": 3,
+  "is_public": true,
+  "is_pending": false,
+  "created_at": "2024-01-01T00:00:00",
+  "updated_at": "2024-01-01T01:00:00"
+}
+```
+
+**错误响应**:
+- `400`: 名称和描述不能为空
+- `401`: 未授权访问
+- `403`: 没有权限修改此人设卡（只有上传者和管理员可以修改）
+- `404`: 人设卡不存在
+- `500`: 修改人设卡失败
+
+### 删除人设卡
+删除整个人设卡及其所有文件。
+
+```http
+DELETE /api/persona/{pc_id}
+Authorization: Bearer {token}
+```
+
+**参数说明**:
+- `pc_id` (路径参数): 人设卡ID
+
+**响应示例**:
+```json
+{
+  "message": "人设卡删除成功"
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限删除此人设卡（只有上传者和管理员可以删除）
+- `404`: 人设卡不存在
+- `500`: 删除人设卡失败
+
 ## 用户Star记录接口
 
 ### 获取用户Star的知识库和人设卡
 获取当前用户Star的所有公开知识库和人设卡。
 
 ```http
-GET /api/user/stars
+GET /api/user/stars?include_details=false
 Authorization: Bearer {token}
 ```
 
-**响应示例**:
+**查询参数说明**:
+- `include_details` (可选): 是否包含完整详情，默认为 `false`
+
+**响应示例**（include_details=false）:
 ```json
 [
   {
@@ -530,6 +822,9 @@ Authorization: Bearer {token}
 ]
 ```
 
+**响应示例**（include_details=true）:
+返回Star记录的同时包含知识库/人设卡的完整信息（包括文件列表、元数据等）。
+
 **错误响应**:
 - `401`: 未授权访问
 - `500`: 获取用户Star记录失败
@@ -537,63 +832,91 @@ Authorization: Bearer {token}
 ## 审核管理接口
 
 ### 获取待审核知识库
-获取所有待审核的知识库列表（需要admin或moderator权限）。
+获取所有待审核的知识库列表，支持分页、搜索、筛选和排序（需要admin或moderator权限）。
 
 ```http
-GET /api/review/knowledge/pending
+GET /api/review/knowledge/pending?page=1&page_size=20&name=&uploader_id=&sort_by=created_at&sort_order=desc
 Authorization: Bearer {token}
 ```
 
+**查询参数说明**:
+- `page` (可选): 页码，从1开始，默认为1
+- `page_size` (可选): 每页数量，范围1-100，默认为20
+- `name` (可选): 按名称搜索，支持模糊匹配
+- `uploader_id` (可选): 按上传者ID筛选
+- `sort_by` (可选): 排序字段，可选值：`created_at`、`updated_at`、`star_count`，默认为 `created_at`
+- `sort_order` (可选): 排序顺序，可选值：`asc`、`desc`，默认为 `desc`
+
 **响应示例**:
 ```json
-[
-  {
-    "id": "kb123",
-    "name": "待审核知识库",
-    "description": "待审核的知识库",
-    "uploader_id": "user123",
-    "copyright_owner": "上传者",
-    "star_count": 0,
-    "is_public": false,
-    "is_pending": true,
-    "created_at": "2024-01-01T00:00:00",
-    "updated_at": "2024-01-01T00:00:00"
-  }
-]
+{
+  "items": [
+    {
+      "id": "kb123",
+      "name": "待审核知识库",
+      "description": "待审核的知识库",
+      "uploader_id": "user123",
+      "copyright_owner": "上传者",
+      "star_count": 0,
+      "is_public": false,
+      "is_pending": true,
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    }
+  ],
+  "total": 10,
+  "page": 1,
+  "page_size": 20
+}
 ```
 
 **错误响应**:
+- `400`: 查询参数无效
 - `403`: 没有审核权限
 - `401`: 未授权访问
 - `500`: 获取待审核知识库失败
 
 ### 获取待审核人设卡
-获取所有待审核的人设卡列表（需要admin或moderator权限）。
+获取所有待审核的人设卡列表，支持分页、搜索、筛选和排序（需要admin或moderator权限）。
 
 ```http
-GET /api/review/persona/pending
+GET /api/review/persona/pending?page=1&page_size=20&name=&uploader_id=&sort_by=created_at&sort_order=desc
 Authorization: Bearer {token}
 ```
 
+**查询参数说明**:
+- `page` (可选): 页码，从1开始，默认为1
+- `page_size` (可选): 每页数量，范围1-100，默认为20
+- `name` (可选): 按名称搜索，支持模糊匹配
+- `uploader_id` (可选): 按上传者ID筛选
+- `sort_by` (可选): 排序字段，可选值：`created_at`、`updated_at`、`star_count`，默认为 `created_at`
+- `sort_order` (可选): 排序顺序，可选值：`asc`、`desc`，默认为 `desc`
+
 **响应示例**:
 ```json
-[
-  {
-    "id": "pc123",
-    "name": "待审核人设卡",
-    "description": "待审核的人设卡",
-    "uploader_id": "user123",
-    "copyright_owner": "上传者",
-    "star_count": 0,
-    "is_public": false,
-    "is_pending": true,
-    "created_at": "2024-01-01T00:00:00",
-    "updated_at": "2024-01-01T00:00:00"
-  }
-]
+{
+  "items": [
+    {
+      "id": "pc123",
+      "name": "待审核人设卡",
+      "description": "待审核的人设卡",
+      "uploader_id": "user123",
+      "copyright_owner": "上传者",
+      "star_count": 0,
+      "is_public": false,
+      "is_pending": true,
+      "created_at": "2024-01-01T00:00:00",
+      "updated_at": "2024-01-01T00:00:00"
+    }
+  ],
+  "total": 5,
+  "page": 1,
+  "page_size": 20
+}
 ```
 
 **错误响应**:
+- `400`: 查询参数无效
 - `403`: 没有审核权限
 - `401`: 未授权访问
 - `500`: 获取待审核人设卡失败
@@ -709,7 +1032,7 @@ Content-Type: application/json
 ## 消息管理接口
 
 ### 发送消息
-向指定用户发送消息。
+向指定用户发送消息，支持单发、群发和广播。
 
 ```http
 POST /api/messages/send
@@ -717,16 +1040,24 @@ Authorization: Bearer {token}
 Content-Type: application/json
 
 {
-  "recipient_id": "user456",
+  "title": "消息标题（可选）",
   "content": "你好，这是一条测试消息",
-  "message_type": "text"
+  "recipient_id": "user456",
+  "recipient_ids": ["user456", "user789"],
+  "message_type": "direct",
+  "summary": "消息摘要（可选）",
+  "broadcast_scope": "all_users"
 }
 ```
 
 **参数说明**:
-- `recipient_id` (必填): 接收者用户ID
+- `title` (可选): 消息标题
 - `content` (必填): 消息内容
-- `message_type` (可选): 消息类型，默认为"text"
+- `recipient_id` (可选): 单个接收者用户ID
+- `recipient_ids` (可选): 多个接收者用户ID数组
+- `message_type` (可选): 消息类型，可选值：`direct`（私信）、`announcement`（公告），默认为 `direct`
+- `summary` (可选): 消息摘要
+- `broadcast_scope` (可选): 广播范围，可选值：`all_users`（所有用户）
 
 **响应示例**:
 ```json
@@ -774,6 +1105,36 @@ Authorization: Bearer {token}
 - `401`: 未授权访问
 - `500`: 获取消息列表失败
 
+### 获取消息详情
+获取指定消息的详细信息。
+
+```http
+GET /api/messages/{message_id}
+Authorization: Bearer {token}
+```
+
+**参数说明**:
+- `message_id` (路径参数): 消息ID
+
+**响应示例**:
+```json
+{
+  "id": "msg123",
+  "sender_id": "user456",
+  "recipient_id": "user123",
+  "title": "消息标题",
+  "content": "消息内容",
+  "is_read": false,
+  "created_at": "2024-01-01T00:00:00"
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限查看此消息
+- `404`: 消息不存在
+- `500`: 获取消息详情失败
+
 ### 标记消息为已读
 将指定消息标记为已读状态。
 
@@ -798,6 +1159,365 @@ Authorization: Bearer {token}
 - `403`: 没有权限标记此消息为已读（非接收者）
 - `401`: 未授权访问
 - `500`: 标记消息已读失败
+
+### 删除消息
+删除指定的消息。
+
+```http
+DELETE /api/messages/{message_id}
+Authorization: Bearer {token}
+```
+
+**参数说明**:
+- `message_id` (路径参数): 消息ID
+
+**响应示例**:
+```json
+{
+  "message": "消息删除成功"
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限删除此消息
+- `404`: 消息不存在
+- `500`: 删除消息失败
+
+### 批量删除消息
+批量删除多条消息。
+
+```http
+POST /api/messages/batch-delete
+Authorization: Bearer {token}
+Content-Type: application/json
+
+["msg123", "msg456", "msg789"]
+```
+
+**参数说明**:
+- 请求体: 消息ID数组
+
+**响应示例**:
+```json
+{
+  "message": "批量删除成功",
+  "deleted_count": 3
+}
+```
+
+**错误响应**:
+- `400`: 消息ID列表为空或格式错误
+- `401`: 未授权访问
+- `500`: 批量删除失败
+
+## 管理员接口
+
+### 获取广播消息历史
+获取所有广播消息的历史记录（需要admin或moderator权限）。
+
+```http
+GET /api/admin/broadcast-messages?page=1&limit=50
+Authorization: Bearer {token}
+```
+
+**查询参数说明**:
+- `page` (可选): 页码，从1开始，默认为1
+- `limit` (可选): 每页数量，默认50
+
+**响应示例**:
+```json
+{
+  "items": [
+    {
+      "id": "msg123",
+      "title": "系统公告",
+      "content": "这是一条系统公告",
+      "sender_id": "admin",
+      "created_at": "2024-01-01T00:00:00"
+    }
+  ],
+  "total": 10,
+  "page": 1,
+  "limit": 50
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限
+- `500`: 获取广播消息失败
+
+### 获取用户列表
+获取所有用户列表，支持分页和搜索（需要admin权限）。
+
+```http
+GET /api/admin/users?page=1&limit=20&search=&role=
+Authorization: Bearer {token}
+```
+
+**查询参数说明**:
+- `page` (可选): 页码，从1开始，默认为1
+- `limit` (可选): 每页数量，默认20
+- `search` (可选): 搜索关键词（用户名或邮箱）
+- `role` (可选): 按角色筛选（user/moderator/admin）
+
+**响应示例**:
+```json
+{
+  "items": [
+    {
+      "id": "user123",
+      "username": "testuser",
+      "email": "user@example.com",
+      "role": "user",
+      "created_at": "2024-01-01T00:00:00"
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "limit": 20
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限
+- `500`: 获取用户列表失败
+
+### 创建新用户
+创建新用户（需要admin权限）。
+
+```http
+POST /api/admin/users
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "username": "newuser",
+  "email": "newuser@example.com",
+  "password": "password123",
+  "role": "user"
+}
+```
+
+**参数说明**:
+- `username` (必填): 用户名
+- `email` (必填): 邮箱地址
+- `password` (必填): 密码
+- `role` (必填): 用户角色（user/moderator/admin）
+
+**响应示例**:
+```json
+{
+  "id": "user456",
+  "username": "newuser",
+  "email": "newuser@example.com",
+  "role": "user",
+  "created_at": "2024-01-01T00:00:00"
+}
+```
+
+**错误响应**:
+- `400`: 用户名或邮箱已存在、参数格式错误
+- `401`: 未授权访问
+- `403`: 没有权限
+- `500`: 创建用户失败
+
+### 更新用户角色
+更新指定用户的角色（需要admin权限）。
+
+```http
+PUT /api/admin/users/{user_id}/role
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "role": "moderator"
+}
+```
+
+**参数说明**:
+- `user_id` (路径参数): 用户ID
+- `role` (必填): 新角色（user/moderator/admin）
+
+**响应示例**:
+```json
+{
+  "message": "用户角色更新成功",
+  "user_id": "user123",
+  "new_role": "moderator"
+}
+```
+
+**错误响应**:
+- `400`: 角色值无效
+- `401`: 未授权访问
+- `403`: 没有权限
+- `404`: 用户不存在
+- `500`: 更新用户角色失败
+
+### 删除用户
+删除指定用户（需要admin权限）。
+
+```http
+DELETE /api/admin/users/{user_id}
+Authorization: Bearer {token}
+```
+
+**参数说明**:
+- `user_id` (路径参数): 用户ID
+
+**响应示例**:
+```json
+{
+  "message": "用户删除成功"
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限
+- `404`: 用户不存在
+- `500`: 删除用户失败
+
+### 获取所有知识库（管理员）
+获取所有知识库，包括待审核和已审核的（需要admin权限）。
+
+```http
+GET /api/admin/knowledge/all?page=1&limit=20&status=&search=
+Authorization: Bearer {token}
+```
+
+**查询参数说明**:
+- `page` (可选): 页码，从1开始，默认为1
+- `limit` (可选): 每页数量，默认20
+- `status` (可选): 按状态筛选（pending/approved/rejected）
+- `search` (可选): 搜索关键词
+
+**响应示例**:
+```json
+{
+  "items": [
+    {
+      "id": "kb123",
+      "name": "知识库",
+      "description": "描述",
+      "uploader_id": "user123",
+      "is_pending": false,
+      "is_public": true,
+      "created_at": "2024-01-01T00:00:00"
+    }
+  ],
+  "total": 50,
+  "page": 1,
+  "limit": 20
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限
+- `500`: 获取知识库列表失败
+
+### 获取所有人设卡（管理员）
+获取所有人设卡，包括待审核和已审核的（需要admin权限）。
+
+```http
+GET /api/admin/persona/all?page=1&limit=20&status=&search=
+Authorization: Bearer {token}
+```
+
+**查询参数说明**:
+- `page` (可选): 页码，从1开始，默认为1
+- `limit` (可选): 每页数量，默认20
+- `status` (可选): 按状态筛选（pending/approved/rejected）
+- `search` (可选): 搜索关键词
+
+**响应示例**:
+```json
+{
+  "items": [
+    {
+      "id": "pc123",
+      "name": "人设卡",
+      "description": "描述",
+      "uploader_id": "user123",
+      "is_pending": false,
+      "is_public": true,
+      "created_at": "2024-01-01T00:00:00"
+    }
+  ],
+  "total": 30,
+  "page": 1,
+  "limit": 20
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限
+- `500`: 获取人设卡列表失败
+
+### 退回知识库
+将已审核通过的知识库退回为待审核状态（需要admin权限）。
+
+```http
+POST /api/admin/knowledge/{kb_id}/revert
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "reason": "退回原因（可选）"
+}
+```
+
+**参数说明**:
+- `kb_id` (路径参数): 知识库ID
+- `reason` (可选): 退回原因
+
+**响应示例**:
+```json
+{
+  "message": "知识库已退回为待审核状态"
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限
+- `404`: 知识库不存在
+- `500`: 退回知识库失败
+
+### 退回人设卡
+将已审核通过的人设卡退回为待审核状态（需要admin权限）。
+
+```http
+POST /api/admin/persona/{pc_id}/revert
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "reason": "退回原因（可选）"
+}
+```
+
+**参数说明**:
+- `pc_id` (路径参数): 人设卡ID
+- `reason` (可选): 退回原因
+
+**响应示例**:
+```json
+{
+  "message": "人设卡已退回为待审核状态"
+}
+```
+
+**错误响应**:
+- `401`: 未授权访问
+- `403`: 没有权限
+- `404`: 人设卡不存在
+- `500`: 退回人设卡失败
 
 ## 邮件服务接口
 
