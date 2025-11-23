@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/knowledge.dart';
 import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
+import '../../constants/app_constants.dart';
+import '../../utils/download_helper.dart';
 import '../knowledge/edit_screen.dart';
 
 class KnowledgeDetailScreen extends StatefulWidget {
@@ -40,14 +43,23 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final apiService = ApiService();
 
+      // 先加载详情，即使收藏状态检查失败也不影响详情显示
       final knowledge = await apiService.getKnowledgeDetail(
         widget.knowledgeId,
         userProvider.token,
       );
-      final isStarred = await apiService.isKnowledgeStarred(
-        widget.knowledgeId,
-        userProvider.token,
-      );
+      
+      // 独立检查收藏状态，即使失败也不影响详情加载
+      bool isStarred = false;
+      try {
+        isStarred = await apiService.isKnowledgeStarred(
+          widget.knowledgeId,
+          userProvider.token,
+        );
+      } catch (e) {
+        // 收藏状态检查失败不影响详情显示，只记录错误
+        debugPrint('检查收藏状态失败: $e');
+      }
 
       setState(() {
         _knowledge = knowledge;
@@ -83,13 +95,13 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
           if (_knowledge != null) {
             _knowledge = Knowledge(
               id: _knowledge!.id,
-              name: _knowledge!.title,
+              name: _knowledge!.name,
               description: _knowledge!.description,
-              uploaderId: _knowledge!.authorId,
-              copyrightOwner: null,
-              starCount: _knowledge!.stars - 1,
+              uploaderId: _knowledge!.uploaderId,
+              copyrightOwner: _knowledge!.copyrightOwner,
+              starCount: _knowledge!.starCount - 1,
               isPublic: _knowledge!.isPublic,
-              fileNames: const [],
+              fileNames: _knowledge!.fileNames,
               createdAt: _knowledge!.createdAt,
               updatedAt: _knowledge!.updatedAt,
               content: _knowledge!.content,
@@ -109,13 +121,13 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
           if (_knowledge != null) {
             _knowledge = Knowledge(
               id: _knowledge!.id,
-              name: _knowledge!.title,
+              name: _knowledge!.name,
               description: _knowledge!.description,
-              uploaderId: _knowledge!.authorId,
-              copyrightOwner: null,
-              starCount: _knowledge!.stars + 1,
+              uploaderId: _knowledge!.uploaderId,
+              copyrightOwner: _knowledge!.copyrightOwner,
+              starCount: _knowledge!.starCount + 1,
               isPublic: _knowledge!.isPublic,
-              fileNames: const [],
+              fileNames: _knowledge!.fileNames,
               createdAt: _knowledge!.createdAt,
               updatedAt: _knowledge!.updatedAt,
               content: _knowledge!.content,
@@ -143,13 +155,35 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
   Future<void> _launchDownloadUrl() async {
     if (_knowledge?.downloadUrl == null) return;
 
-    final url = Uri.parse(_knowledge!.downloadUrl!);
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('无法打开下载链接')));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('正在下载...')),
+      );
+    }
+
+    try {
+      // 使用 DownloadHelper 下载文件（自动携带 token）
+      final success = await DownloadHelper.downloadFile(
+        downloadUrl: _knowledge!.downloadUrl!,
+      );
+
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('下载成功')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('下载失败，请稍后重试')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('下载失败: $e')),
+        );
+      }
     }
   }
 
@@ -162,16 +196,18 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
         foregroundColor: Colors.white,
         actions: [
           if (_knowledge != null) ...[
-            // 编辑按钮
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.white),
-              onPressed: _editKnowledge,
-            ),
-            // 删除按钮
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.white),
-              onPressed: _deleteKnowledge,
-            ),
+            // 编辑按钮（仅对有权限的用户显示）
+            if (_canEditKnowledge())
+              IconButton(
+                icon: const Icon(Icons.edit, color: Colors.white),
+                onPressed: _editKnowledge,
+              ),
+            // 删除按钮（仅对有权限的用户显示）
+            if (_canDeleteKnowledge())
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.white),
+                onPressed: _deleteKnowledge,
+              ),
             // 收藏按钮
             IconButton(
               icon: _isStarring
@@ -381,55 +417,140 @@ class _KnowledgeDetailScreenState extends State<KnowledgeDetailScreen> {
     }
   }
 
+  // 检查是否可以删除知识库
+  bool _canDeleteKnowledge() {
+    if (_knowledge == null) return false;
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final currentUser = userProvider.currentUser;
+    
+    if (currentUser == null) return false;
+    
+    // 上传者、管理员和审核员都可以删除
+    return _knowledge!.uploaderId == currentUser.id ||
+           currentUser.isAdmin ||
+           currentUser.isModerator;
+  }
+
+  // 检查是否可以编辑知识库
+  bool _canEditKnowledge() {
+    if (_knowledge == null) return false;
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final currentUser = userProvider.currentUser;
+    
+    if (currentUser == null) return false;
+    
+    // 上传者、管理员和审核员都可以编辑
+    return _knowledge!.uploaderId == currentUser.id ||
+           currentUser.isAdmin ||
+           currentUser.isModerator;
+  }
+
   // 删除知识库
   void _deleteKnowledge() async {
     if (_knowledge == null) return;
     
-    // 显示确认对话框
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要删除知识库"${_knowledge!.title}"吗？此操作不可恢复。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final currentUser = userProvider.currentUser;
+    final isModerator = currentUser?.isModerator ?? false;
+    final isUploader = _knowledge!.uploaderId == currentUser?.id;
     
-    if (confirmed == true) {
-      try {
-        setState(() {
-          _isLoading = true;
-          _errorMessage = null;
-        });
-        
-        await ApiService().deleteKnowledge(_knowledge!.id);
-        
-        // 删除成功，返回上一页
-        Navigator.of(context).pop(true);
-        
-        // 显示成功消息
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('知识库删除成功')),
-        );
-      } catch (e) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString();
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: ${e.toString()}')),
-        );
-      }
+    String? deleteReason;
+    
+    // 如果是审核员且不是上传者，需要填写删除原因
+    if (isModerator && !isUploader) {
+      final reasonController = TextEditingController();
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('确认删除'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('确定要删除知识库"${_knowledge!.title}"吗？此操作不可恢复。'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: '删除原因',
+                  hintText: '请填写删除原因（必填）',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (reasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请填写删除原因')),
+                  );
+                  return;
+                }
+                deleteReason = reasonController.text.trim();
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('删除'),
+            ),
+          ],
+        ),
+      );
+      
+      if (confirmed != true) return;
+    } else {
+      // 上传者或管理员删除，显示普通确认对话框
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('确认删除'),
+          content: Text('确定要删除知识库"${_knowledge!.title}"吗？此操作不可恢复。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('删除'),
+            ),
+          ],
+        ),
+      );
+      
+      if (confirmed != true) return;
+    }
+    
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      
+      // TODO: 如果后端支持删除原因参数，需要传递deleteReason
+      await ApiService().deleteKnowledge(_knowledge!.id);
+      
+      // 删除成功，返回上一页
+      Navigator.of(context).pop(true);
+      
+      // 显示成功消息
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('知识库删除成功')),
+      );
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('删除失败: ${e.toString()}')),
+      );
     }
   }
 }

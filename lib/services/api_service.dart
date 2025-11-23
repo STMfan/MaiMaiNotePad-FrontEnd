@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 import '../models/knowledge.dart';
 import '../models/persona.dart';
+import '../models/paginated_response.dart';
 
 class ApiService {
-  late Dio _dio;
+  Dio? _dio;
+  Completer<void>? _initCompleter;
   static final ApiService _instance = ApiService._internal();
 
   factory ApiService() {
@@ -16,56 +20,97 @@ class ApiService {
     _initDio();
   }
 
-  void _initDio() async {
-    final prefs = await SharedPreferences.getInstance();
-    final baseUrl =
-        prefs.getString(AppConstants.apiBaseUrlKey) ?? AppConstants.apiBaseUrl;
+  Future<void> _initDio() async {
+    // 如果已经在初始化中，等待完成
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
 
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json', // 明确指定接受JSON响应
-        },
-        responseType: ResponseType.json, // 尝试自动解析JSON
-        validateStatus: (status) =>
-            status != null && status < 500, // 接受所有非500错误
-      ),
-    );
+    // 如果已经初始化完成，直接返回
+    if (_dio != null) {
+      return;
+    }
 
-    // 添加拦截器，自动添加token
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final token = prefs.getString(AppConstants.tokenKey);
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
-          handler.next(options);
-        },
-        onError: (error, handler) async {
-          // 如果是401错误，清除本地存储的token
-          if (error.response?.statusCode == 401) {
+    // 创建新的 Completer
+    _initCompleter = Completer<void>();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final baseUrl =
+          prefs.getString(AppConstants.apiBaseUrlKey) ?? AppConstants.apiBaseUrl;
+
+      _dio = Dio(
+        BaseOptions(
+          baseUrl: baseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json', // 明确指定接受JSON响应
+          },
+          responseType: ResponseType.json, // 尝试自动解析JSON
+          validateStatus: (status) =>
+              status != null && status < 500, // 接受所有非500错误
+        ),
+      );
+
+      // 添加拦截器，自动添加token
+      _dio!.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) async {
+            // 每次请求时重新获取 SharedPreferences 实例，确保读取到最新的 token
             final prefs = await SharedPreferences.getInstance();
-            await prefs.remove(AppConstants.tokenKey);
-            await prefs.remove(AppConstants.userIdKey);
-            await prefs.remove(AppConstants.userNameKey);
-            await prefs.remove(AppConstants.userRoleKey);
-          }
-          handler.next(error);
-        },
-      ),
-    );
+            final token = prefs.getString(AppConstants.tokenKey);
+            if (token != null) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+            handler.next(options);
+          },
+          onError: (error, handler) async {
+            // 如果是401错误，清除本地存储的token
+            if (error.response?.statusCode == 401) {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove(AppConstants.tokenKey);
+              await prefs.remove(AppConstants.userIdKey);
+              await prefs.remove(AppConstants.userNameKey);
+              await prefs.remove(AppConstants.userRoleKey);
+            }
+            handler.next(error);
+          },
+        ),
+      );
+
+      _initCompleter!.complete();
+    } catch (e) {
+      _initCompleter!.completeError(e);
+      _initCompleter = null;
+      rethrow;
+    }
+  }
+
+  // 确保 Dio 已初始化
+  Future<void> _ensureInitialized() async {
+    if (_dio == null) {
+      await _initDio();
+    }
+  }
+
+  // 统一处理响应格式：如果后端直接返回数据（没有success/data包装），则包装成统一格式
+  Response _normalizeResponse(Response response) {
+    if (response.data is List ||
+        (response.data is Map && !response.data.containsKey('success'))) {
+      response.data = {'success': true, 'data': response.data};
+    }
+    return response;
   }
 
   // 更新API基础URL
   Future<void> updateBaseUrl(String newBaseUrl) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.apiBaseUrlKey, newBaseUrl);
-    _initDio(); // 重新初始化Dio
+    _dio = null;
+    _initCompleter = null;
+    await _initDio(); // 重新初始化Dio
   }
 
   // 获取当前API基础URL
@@ -80,17 +125,10 @@ class ApiService {
     String path, {
     Map<String, dynamic>? queryParameters,
   }) async {
+    await _ensureInitialized();
     try {
-      final response = await _dio.get(path, queryParameters: queryParameters);
-
-      // 处理响应格式不匹配问题
-      // 如果后端直接返回数据（没有success/data包装），则包装成统一格式
-      if (response.data is List ||
-          (response.data is Map && !response.data.containsKey('success'))) {
-        response.data = {'success': true, 'data': response.data};
-      }
-
-      return response;
+      final response = await _dio!.get(path, queryParameters: queryParameters);
+      return _normalizeResponse(response);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -103,6 +141,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
     ResponseType? responseType,
   }) async {
+    await _ensureInitialized();
     try {
       final options = Options(
         responseType: responseType,
@@ -111,21 +150,13 @@ class ApiService {
           'Accept': 'application/json, text/plain, */*', // 接受多种响应类型
         },
       );
-      final response = await _dio.post(
+      final response = await _dio!.post(
         path,
         data: data,
         queryParameters: queryParameters,
         options: options,
       );
-
-      // 处理响应格式不匹配问题
-      // 如果后端直接返回数据（没有success/data包装），则包装成统一格式
-      if (response.data is List ||
-          (response.data is Map && !response.data.containsKey('success'))) {
-        response.data = {'success': true, 'data': response.data};
-      }
-
-      return response;
+      return _normalizeResponse(response);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -137,21 +168,14 @@ class ApiService {
     dynamic data,
     Map<String, dynamic>? queryParameters,
   }) async {
+    await _ensureInitialized();
     try {
-      final response = await _dio.put(
+      final response = await _dio!.put(
         path,
         data: data,
         queryParameters: queryParameters,
       );
-
-      // 处理响应格式不匹配问题
-      // 如果后端直接返回数据（没有success/data包装），则包装成统一格式
-      if (response.data is List ||
-          (response.data is Map && !response.data.containsKey('success'))) {
-        response.data = {'success': true, 'data': response.data};
-      }
-
-      return response;
+      return _normalizeResponse(response);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -163,21 +187,14 @@ class ApiService {
     dynamic data,
     Map<String, dynamic>? queryParameters,
   }) async {
+    await _ensureInitialized();
     try {
-      final response = await _dio.delete(
+      final response = await _dio!.delete(
         path,
         data: data,
         queryParameters: queryParameters,
       );
-
-      // 处理响应格式不匹配问题
-      // 如果后端直接返回数据（没有success/data包装），则包装成统一格式
-      if (response.data is List ||
-          (response.data is Map && !response.data.containsKey('success'))) {
-        response.data = {'success': true, 'data': response.data};
-      }
-
-      return response;
+      return _normalizeResponse(response);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -185,8 +202,9 @@ class ApiService {
 
   // 文件上传
   Future<Response> upload(String path, FormData formData) async {
+    await _ensureInitialized();
     try {
-      return await _dio.post(path, data: formData);
+      return await _dio!.post(path, data: formData);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -198,6 +216,7 @@ class ApiService {
     List<String> filePaths, {
     Map<String, dynamic>? metadata,
   }) async {
+    await _ensureInitialized();
     try {
       FormData formData = FormData();
 
@@ -220,11 +239,25 @@ class ApiService {
         });
       }
 
-      final response = await _dio.post(path, data: formData);
+      final response = await _dio!.post(path, data: formData);
       return response.data;
     } on DioException catch (e) {
       throw _handleError(e);
     }
+  }
+
+  // 辅助方法：从响应中提取列表数据
+  // 处理响应格式：可能是直接列表，也可能是包装后的格式
+  List<dynamic> _extractListFromResponse(Response response) {
+    if (response.data is List) {
+      return response.data;
+    } else if (response.data is Map && response.data.containsKey('data')) {
+      final data = response.data['data'];
+      if (data is List) {
+        return data;
+      }
+    }
+    return [];
   }
 
   // 错误处理
@@ -256,24 +289,78 @@ class ApiService {
   }
 
   // 获取用户Star的知识库和人设卡
-  Future<Map<String, dynamic>> getUserStars(String token) async {
+  // 注意：后端返回的是一个列表，每个元素包含 type 和 target_id
+  Future<Map<String, dynamic>> getUserStars(String token, {bool includeDetails = false}) async {
     try {
-      final response = await get('/user/stars');
-      final data = response.data;
+      // 使用include_details参数获取完整信息
+      final response = await get('/api/user/stars?include_details=$includeDetails');
+      // 使用统一的列表提取方法
+      final List<dynamic> starsList = _extractListFromResponse(response);
 
-      // 解析知识库列表
-      final List<dynamic> knowledgeList = data['knowledge'] ?? [];
-      final List<Knowledge> knowledgeItems = knowledgeList
-          .map((item) => Knowledge.fromJson(item))
-          .toList();
+      final List<String> knowledgeIds = [];
+      final List<String> personaIds = [];
+      final List<Knowledge> knowledgeItems = [];
+      final List<Persona> personaItems = [];
 
-      // 解析人设卡列表
-      final List<dynamic> personaList = data['personas'] ?? [];
-      final List<Persona> personaItems = personaList
-          .map((item) => Persona.fromJson(item))
-          .toList();
+      for (var star in starsList) {
+        if (star is Map<String, dynamic>) {
+          final type = star['type'] as String?;
+          final targetId = star['target_id'] as String?;
+          if (targetId != null) {
+            if (type == 'knowledge') {
+              knowledgeIds.add(targetId);
+              // 如果包含详情，直接解析
+              if (includeDetails) {
+                try {
+                  final kb = Knowledge.fromJson(star);
+                  knowledgeItems.add(kb);
+                } catch (e) {
+                  debugPrint('Failed to parse knowledge: $e');
+                }
+              }
+            } else if (type == 'persona') {
+              personaIds.add(targetId);
+              // 如果包含详情，直接解析
+              if (includeDetails) {
+                try {
+                  final pc = Persona.fromJson(star);
+                  personaItems.add(pc);
+                } catch (e) {
+                  debugPrint('Failed to parse persona: $e');
+                }
+              }
+            }
+          }
+        }
+      }
 
-      return {'knowledge': knowledgeItems, 'personas': personaItems};
+      // 如果不包含详情，需要单独获取（保持向后兼容）
+      if (!includeDetails) {
+      for (var id in knowledgeIds) {
+        try {
+          final kb = await getKnowledgeDetail(id, token);
+          knowledgeItems.add(kb);
+        } catch (e) {
+          debugPrint('Failed to get knowledge detail for $id: $e');
+        }
+      }
+
+      for (var id in personaIds) {
+        try {
+          final pc = await getPersonaDetail(id, token);
+          personaItems.add(pc);
+        } catch (e) {
+          debugPrint('Failed to get persona detail for $id: $e');
+          }
+        }
+      }
+
+      return {
+        'knowledge': knowledgeItems,
+        'personas': personaItems,
+        'knowledgeIds': knowledgeIds,
+        'personaIds': personaIds,
+      };
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -285,59 +372,119 @@ class ApiService {
     String? token,
   ) async {
     try {
-      final response = await get('/knowledge/$knowledgeId');
-      return Knowledge.fromJson(response.data);
+      final response = await get('/api/knowledge/$knowledgeId');
+      // 处理响应格式：可能是 {'success': true, 'data': {...}} 或直接 {...}
+      final data = response.data is Map && response.data.containsKey('data')
+          ? response.data['data']
+          : response.data;
+      
+      // 调试信息
+      if (kDebugMode) {
+        debugPrint('Knowledge detail response data: $data');
+      }
+      
+      return Knowledge.fromJson(data);
     } on DioException catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting knowledge detail: $e');
+        debugPrint('Response: ${e.response?.data}');
+      }
       throw _handleError(e);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Unexpected error getting knowledge detail: $e');
+      }
+      rethrow;
     }
   }
 
   // 获取人设卡详情
   Future<Persona> getPersonaDetail(String personaId, String? token) async {
     try {
-      final response = await get('/persona/$personaId');
-      return Persona.fromJson(response.data);
+      final response = await get('/api/persona/$personaId');
+      // 处理响应格式：可能是 {'success': true, 'data': {...}} 或直接 {...}
+      final data = response.data is Map && response.data.containsKey('data')
+          ? response.data['data']
+          : response.data;
+      
+      // 调试信息
+      if (kDebugMode) {
+        debugPrint('Persona detail response data: $data');
+      }
+      
+      return Persona.fromJson(data);
     } on DioException catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting persona detail: $e');
+        debugPrint('Response: ${e.response?.data}');
+      }
       throw _handleError(e);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Unexpected error getting persona detail: $e');
+      }
+      rethrow;
     }
   }
 
   // 检查知识库是否已Star
   Future<bool> isKnowledgeStarred(String knowledgeId, String? token) async {
     try {
-      // 注意：这里假设后端有一个检查是否已star的接口
-      // 如果没有，可能需要通过获取用户Star列表来判断
-      final response = await get('/knowledge/$knowledgeId/starred');
-      return response.data['starred'] ?? false;
-    } on DioException catch (e) {
-      // 如果接口不存在，假设未star
-      if (e.response?.statusCode == 404) {
+      // 如果没有token，返回false
+      if (token == null) {
         return false;
       }
-      throw _handleError(e);
+      // 使用新的专门接口
+      final response = await get('/api/knowledge/$knowledgeId/starred');
+      // 处理响应格式：可能是 {'success': true, 'data': {...}} 或直接 {...}
+      final responseData = response.data is Map && response.data.containsKey('data')
+          ? response.data['data']
+          : response.data;
+      
+      if (responseData is Map<String, dynamic>) {
+        return responseData['starred'] as bool? ?? false;
+      }
+      return false;
+    } catch (e) {
+      // 如果获取失败，假设未star
+      if (kDebugMode) {
+        debugPrint('检查知识库收藏状态失败: $e');
+      }
+      return false;
     }
   }
 
   // 检查人设卡是否已Star
   Future<bool> isPersonaStarred(String personaId, String? token) async {
     try {
-      // 注意：这里假设后端有一个检查是否已star的接口
-      // 如果没有，可能需要通过获取用户Star列表来判断
-      final response = await get('/persona/$personaId/starred');
-      return response.data['starred'] ?? false;
-    } on DioException catch (e) {
-      // 如果接口不存在，假设未star
-      if (e.response?.statusCode == 404) {
+      // 如果没有token，返回false
+      if (token == null) {
         return false;
       }
-      throw _handleError(e);
+      // 使用新的专门接口
+      final response = await get('/api/persona/$personaId/starred');
+      // 处理响应格式：可能是 {'success': true, 'data': {...}} 或直接 {...}
+      final responseData = response.data is Map && response.data.containsKey('data')
+          ? response.data['data']
+          : response.data;
+      
+      if (responseData is Map<String, dynamic>) {
+        return responseData['starred'] as bool? ?? false;
+      }
+      return false;
+    } catch (e) {
+      // 如果获取失败，假设未star
+      if (kDebugMode) {
+        debugPrint('检查人设卡收藏状态失败: $e');
+      }
+      return false;
     }
   }
 
   // Star知识库
   Future<void> starKnowledge(String knowledgeId, String? token) async {
     try {
-      await post('/knowledge/$knowledgeId/star');
+      await post('/api/knowledge/$knowledgeId/star');
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -346,7 +493,7 @@ class ApiService {
   // 取消Star知识库
   Future<void> unstarKnowledge(String knowledgeId, String? token) async {
     try {
-      await delete('/knowledge/$knowledgeId/star');
+      await delete('/api/knowledge/$knowledgeId/star');
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -355,7 +502,7 @@ class ApiService {
   // Star人设卡
   Future<void> starPersona(String personaId, String? token) async {
     try {
-      await post('/persona/$personaId/star');
+      await post('/api/persona/$personaId/star');
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -364,43 +511,71 @@ class ApiService {
   // 取消Star人设卡
   Future<void> unstarPersona(String personaId, String? token) async {
     try {
-      await delete('/persona/$personaId/star');
+      await delete('/api/persona/$personaId/star');
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
   // 获取公开知识库列表
-  Future<List<Knowledge>> getPublicKnowledge({
+  Future<PaginatedResponse<Knowledge>> getPublicKnowledge({
     int page = 1,
-    int limit = 20,
+    int pageSize = 20,
+    String? name,
+    String? uploaderId,
+    String sortBy = 'created_at',
+    String sortOrder = 'desc',
   }) async {
     try {
       final response = await get(
-        '/knowledge/public',
-        queryParameters: {'page': page, 'limit': limit},
+        '/api/knowledge/public',
+        queryParameters: {
+          'page': page,
+          'page_size': pageSize,
+          if (name != null) 'name': name,
+          if (uploaderId != null) 'uploader_id': uploaderId,
+          'sort_by': sortBy,
+          'sort_order': sortOrder,
+        },
       );
 
-      final List<dynamic> dataList = response.data;
-      return dataList.map((item) => Knowledge.fromJson(item)).toList();
+      final Map<String, dynamic> data = response.data;
+      return PaginatedResponse.fromJson(
+        data,
+        (json) => Knowledge.fromJson(json),
+      );
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
   // 获取公开人设卡列表
-  Future<List<Persona>> getPublicPersonas({
+  Future<PaginatedResponse<Persona>> getPublicPersonas({
     int page = 1,
-    int limit = 20,
+    int pageSize = 20,
+    String? name,
+    String? uploaderId,
+    String sortBy = 'created_at',
+    String sortOrder = 'desc',
   }) async {
     try {
       final response = await get(
-        '/persona/public',
-        queryParameters: {'page': page, 'limit': limit},
+        '/api/persona/public',
+        queryParameters: {
+          'page': page,
+          'page_size': pageSize,
+          if (name != null) 'name': name,
+          if (uploaderId != null) 'uploader_id': uploaderId,
+          'sort_by': sortBy,
+          'sort_order': sortOrder,
+        },
       );
 
-      final List<dynamic> dataList = response.data;
-      return dataList.map((item) => Persona.fromJson(item)).toList();
+      final Map<String, dynamic> data = response.data;
+      return PaginatedResponse.fromJson(
+        data,
+        (json) => Persona.fromJson(json),
+      );
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -414,11 +589,11 @@ class ApiService {
   }) async {
     try {
       final response = await get(
-        '/knowledge/user/$userId',
-        queryParameters: {'page': page, 'limit': limit},
+        '/api/knowledge/user/$userId',
+        // 注意：后端用户接口不支持分页，返回全部数据
       );
 
-      final List<dynamic> dataList = response.data;
+      final List<dynamic> dataList = _extractListFromResponse(response);
       return dataList.map((item) => Knowledge.fromJson(item)).toList();
     } on DioException catch (e) {
       throw _handleError(e);
@@ -433,11 +608,11 @@ class ApiService {
   }) async {
     try {
       final response = await get(
-        '/persona/user/$userId',
-        queryParameters: {'page': page, 'limit': limit},
+        '/api/persona/user/$userId',
+        // 注意：后端用户接口不支持分页，返回全部数据
       );
 
-      final List<dynamic> dataList = response.data;
+      final List<dynamic> dataList = _extractListFromResponse(response);
       return dataList.map((item) => Persona.fromJson(item)).toList();
     } on DioException catch (e) {
       throw _handleError(e);
@@ -447,7 +622,87 @@ class ApiService {
   // 获取当前用户信息
   Future<Map<String, dynamic>> getCurrentUser() async {
     try {
-      final response = await get('/users/me');
+      final response = await get('/api/users/me');
+      // 处理响应数据：如果被包装在 data 字段中，则提取 data 字段
+      if (response.data is Map<String, dynamic> && 
+          response.data.containsKey('data') && 
+          response.data.containsKey('success')) {
+        return response.data['data'] as Map<String, dynamic>;
+      }
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 修改密码
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    try {
+      final response = await put(
+        '/api/users/me/password',
+        data: {
+          'current_password': currentPassword,
+          'new_password': newPassword,
+          'confirm_password': confirmPassword,
+        },
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 上传头像
+  Future<Map<String, dynamic>> uploadAvatar(String filePath) async {
+    try {
+      await _ensureInitialized();
+      FormData formData = FormData();
+      
+      // 根据平台选择文件处理方式
+      if (kIsWeb) {
+        // Web平台需要先读取文件为bytes
+        // 注意：这里假设filePath在Web平台实际上是文件对象
+        // 实际使用时可能需要调整
+        throw UnimplementedError('Web平台头像上传需要特殊处理');
+      } else {
+        // 其他平台使用文件路径
+        formData.files.add(
+          MapEntry(
+            'avatar',
+            await MultipartFile.fromFile(filePath, filename: filePath.split('/').last),
+          ),
+        );
+      }
+      
+      final response = await _dio!.post('/api/users/me/avatar', data: formData);
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 上传头像（使用MultipartFile，支持Web平台）
+  Future<Map<String, dynamic>> uploadAvatarFile(MultipartFile file) async {
+    try {
+      await _ensureInitialized();
+      FormData formData = FormData();
+      formData.files.add(MapEntry('avatar', file));
+      
+      final response = await _dio!.post('/api/users/me/avatar', data: formData);
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 删除头像
+  Future<Map<String, dynamic>> deleteAvatar() async {
+    try {
+      final response = await delete('/api/users/me/avatar');
       return response.data;
     } on DioException catch (e) {
       throw _handleError(e);
@@ -473,7 +728,7 @@ class ApiService {
       };
 
       final responseData = await uploadFiles(
-        '/knowledge/upload',
+        '/api/knowledge/upload',
         filePaths,
         metadata: metadata,
       );
@@ -502,7 +757,7 @@ class ApiService {
       };
 
       final responseData = await uploadFiles(
-        '/persona/upload',
+        '/api/persona/upload',
         filePaths,
         metadata: metadata,
       );
@@ -513,36 +768,64 @@ class ApiService {
   }
 
   // 获取待审核知识库
-  Future<List<Knowledge>> getPendingKnowledge({
+  Future<PaginatedResponse<Knowledge>> getPendingKnowledge({
     int page = 1,
-    int limit = 20,
+    int pageSize = 20,
+    String? name,
+    String? uploaderId,
+    String sortBy = 'created_at',
+    String sortOrder = 'desc',
   }) async {
     try {
       final response = await get(
-        '/review/knowledge/pending',
-        queryParameters: {'page': page, 'limit': limit},
+        '/api/review/knowledge/pending',
+        queryParameters: {
+          'page': page,
+          'page_size': pageSize,
+          if (name != null) 'name': name,
+          if (uploaderId != null) 'uploader_id': uploaderId,
+          'sort_by': sortBy,
+          'sort_order': sortOrder,
+        },
       );
 
-      final List<dynamic> dataList = response.data;
-      return dataList.map((item) => Knowledge.fromJson(item)).toList();
+      final Map<String, dynamic> data = response.data;
+      return PaginatedResponse.fromJson(
+        data,
+        (json) => Knowledge.fromJson(json),
+      );
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
   // 获取待审核人设卡
-  Future<List<Persona>> getPendingPersonas({
+  Future<PaginatedResponse<Persona>> getPendingPersonas({
     int page = 1,
-    int limit = 20,
+    int pageSize = 20,
+    String? name,
+    String? uploaderId,
+    String sortBy = 'created_at',
+    String sortOrder = 'desc',
   }) async {
     try {
       final response = await get(
-        '/review/persona/pending',
-        queryParameters: {'page': page, 'limit': limit},
+        '/api/review/persona/pending',
+        queryParameters: {
+          'page': page,
+          'page_size': pageSize,
+          if (name != null) 'name': name,
+          if (uploaderId != null) 'uploader_id': uploaderId,
+          'sort_by': sortBy,
+          'sort_order': sortOrder,
+        },
       );
 
-      final List<dynamic> dataList = response.data;
-      return dataList.map((item) => Persona.fromJson(item)).toList();
+      final Map<String, dynamic> data = response.data;
+      return PaginatedResponse.fromJson(
+        data,
+        (json) => Persona.fromJson(json),
+      );
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -551,7 +834,7 @@ class ApiService {
   // 审核通过知识库
   Future<void> approveKnowledge(String knowledgeId) async {
     try {
-      await post('/review/knowledge/$knowledgeId/approve');
+      await post('/api/review/knowledge/$knowledgeId/approve');
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -561,7 +844,7 @@ class ApiService {
   Future<void> rejectKnowledge(String knowledgeId, {String? reason}) async {
     try {
       await post(
-        '/review/knowledge/$knowledgeId/reject',
+        '/api/review/knowledge/$knowledgeId/reject',
         data: {'reason': reason ?? ''},
       );
     } on DioException catch (e) {
@@ -572,7 +855,7 @@ class ApiService {
   // 审核通过人设卡
   Future<void> approvePersona(String personaId) async {
     try {
-      await post('/review/persona/$personaId/approve');
+      await post('/api/review/persona/$personaId/approve');
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -582,7 +865,7 @@ class ApiService {
   Future<void> rejectPersona(String personaId, {String? reason}) async {
     try {
       await post(
-        '/review/persona/$personaId/reject',
+        '/api/review/persona/$personaId/reject',
         data: {'reason': reason ?? ''},
       );
     } on DioException catch (e) {
@@ -592,30 +875,61 @@ class ApiService {
 
   // 发送消息
   Future<void> sendMessage({
-    required String recipientId,
+    required String title,
     required String content,
-    String? subject,
+    String? summary,
+    String? recipientId,
+    List<String>? recipientIds,
+    bool asAnnouncement = false,
+    bool broadcastAll = false,
   }) async {
     try {
+      final Map<String, dynamic> payload = {
+        'title': title,
+        'content': content,
+        'message_type': asAnnouncement ? 'announcement' : 'direct',
+      };
+
+      if (summary != null && summary.isNotEmpty) {
+        payload['summary'] = summary;
+      }
+
+      if (recipientId != null) {
+        payload['recipient_id'] = recipientId;
+      }
+
+      if (recipientIds != null && recipientIds.isNotEmpty) {
+        payload['recipient_ids'] = recipientIds;
+      }
+
+      if (broadcastAll) {
+        payload['broadcast_scope'] = 'all_users';
+      }
+
       await post(
-        '/messages/send',
-        data: {
-          'recipientId': recipientId,
-          'content': content,
-          'subject': subject ?? '',
-        },
+        '/api/messages/send',
+        data: payload,
       );
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
-  // 获取用户消息
-  Future<List<dynamic>> getUserMessages({int page = 1, int limit = 20}) async {
+  // 获取广播消息历史（管理员和审核员）
+  Future<Map<String, dynamic>> getBroadcastMessages({
+    int page = 1,
+    int limit = 50,
+  }) async {
     try {
+      final offset = (page - 1) * limit;
+      final queryParameters = <String, dynamic>{
+        'limit': limit,
+        'offset': offset,
+      };
+
       final response = await get(
-        '/messages',
-        queryParameters: {'page': page, 'limit': limit},
+        '/api/admin/broadcast-messages',
+        queryParameters: queryParameters,
       );
 
       return response.data;
@@ -624,10 +938,73 @@ class ApiService {
     }
   }
 
+  // 获取消息详情
+  Future<Map<String, dynamic>> getMessageDetail(String messageId) async {
+    try {
+      final response = await get('/api/messages/$messageId');
+      if (response.data is Map && response.data.containsKey('data')) {
+        return response.data['data'];
+      }
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 获取用户消息
+  // 注意：后端使用 offset 和 limit，而不是 page
+  Future<List<dynamic>> getUserMessages({
+    int page = 1,
+    int limit = 50,
+    String? otherUserId,
+  }) async {
+    try {
+      final offset = (page - 1) * limit;
+      final queryParameters = <String, dynamic>{
+        'limit': limit,
+        'offset': offset,
+      };
+      if (otherUserId != null) {
+        queryParameters['other_user_id'] = otherUserId;
+      }
+
+      final response = await get(
+        '/api/messages',
+        queryParameters: queryParameters,
+      );
+
+      return _extractListFromResponse(response);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // 标记消息为已读
   Future<void> markMessageAsRead(String messageId) async {
     try {
-      await post('/messages/$messageId/read');
+      await post('/api/messages/$messageId/read');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 删除消息
+  Future<void> deleteMessage(String messageId) async {
+    try {
+      await delete('/api/messages/$messageId');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 批量删除消息
+  Future<Map<String, dynamic>> deleteMessages(List<String> messageIds) async {
+    try {
+      final response = await post(
+        '/api/messages/batch-delete',
+        data: messageIds,
+      );
+      return response.data;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -636,31 +1013,185 @@ class ApiService {
   // 删除知识库
   Future<void> deleteKnowledge(String knowledgeId) async {
     try {
-      await delete('/knowledge/$knowledgeId');
+      await delete('/api/knowledge/$knowledgeId');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 删除人设卡
+  Future<void> deletePersona(String personaId) async {
+    try {
+      await delete('/api/persona/$personaId');
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
   // 更新知识库
+  // 根据API文档：PUT /api/knowledge/{kb_id} 支持 name, description, copyright_owner
   Future<Knowledge> updateKnowledge({
     required String knowledgeId,
     String? name,
     String? description,
-    String? content,
-    List<String>? tags,
-    bool? isPublic,
+    String? copyrightOwner,
   }) async {
     try {
       final data = <String, dynamic>{};
       if (name != null) data['name'] = name;
       if (description != null) data['description'] = description;
-      if (content != null) data['content'] = content;
-      if (tags != null) data['tags'] = tags.join(',');
-      if (isPublic != null) data['isPublic'] = isPublic;
+      if (copyrightOwner != null) data['copyright_owner'] = copyrightOwner;
 
-      final response = await put('/knowledge/$knowledgeId', data: data);
+      final response = await put('/api/knowledge/$knowledgeId', data: data);
       return Knowledge.fromJson(response.data);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ========== 用户管理API（仅限admin） ==========
+
+  // 获取所有用户列表
+  Future<Response> getAllUsers({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    String? role,
+  }) async {
+    try {
+      final queryParameters = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+      };
+      if (search != null && search.isNotEmpty) {
+        queryParameters['search'] = search;
+      }
+      if (role != null && role.isNotEmpty) {
+        queryParameters['role'] = role;
+      }
+
+      return await get('/api/admin/users', queryParameters: queryParameters);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 更新用户角色
+  Future<Response> updateUserRole(String userId, String role) async {
+    try {
+      return await put(
+        '/api/admin/users/$userId/role',
+        data: {'role': role},
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 删除用户
+  Future<Response> deleteUser(String userId) async {
+    try {
+      return await delete('/api/admin/users/$userId');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 创建新用户
+  Future<Response> createUser({
+    required String username,
+    required String email,
+    required String password,
+    required String role,
+  }) async {
+    try {
+      return await post(
+        '/api/admin/users',
+        data: {
+          'username': username,
+          'email': email,
+          'password': password,
+          'role': role,
+        },
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ========== 内容管理API（仅限admin） ==========
+
+  // 获取所有知识库（管理员视图）
+  Future<Response> getAllKnowledgeBases({
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? search,
+  }) async {
+    try {
+      final queryParameters = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+      };
+      if (status != null && status.isNotEmpty) {
+        queryParameters['status'] = status;
+      }
+      if (search != null && search.isNotEmpty) {
+        queryParameters['search'] = search;
+      }
+
+      return await get('/api/admin/knowledge/all', queryParameters: queryParameters);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 获取所有人设卡（管理员视图）
+  Future<Response> getAllPersonas({
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? search,
+  }) async {
+    try {
+      final queryParameters = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+      };
+      if (status != null && status.isNotEmpty) {
+        queryParameters['status'] = status;
+      }
+      if (search != null && search.isNotEmpty) {
+        queryParameters['search'] = search;
+      }
+
+      return await get('/api/admin/persona/all', queryParameters: queryParameters);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 退回知识库
+  Future<Response> revertKnowledgeBase(String kbId, {String? reason}) async {
+    try {
+      final data = <String, dynamic>{};
+      if (reason != null && reason.isNotEmpty) {
+        data['reason'] = reason;
+      }
+      return await post('/api/admin/knowledge/$kbId/revert', data: data);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // 退回人设卡
+  Future<Response> revertPersonaCard(String pcId, {String? reason}) async {
+    try {
+      final data = <String, dynamic>{};
+      if (reason != null && reason.isNotEmpty) {
+        data['reason'] = reason;
+      }
+      return await post('/api/admin/persona/$pcId/revert', data: data);
     } on DioException catch (e) {
       throw _handleError(e);
     }

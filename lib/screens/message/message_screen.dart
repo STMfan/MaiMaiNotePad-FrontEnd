@@ -27,36 +27,17 @@ class _MessageScreenState extends State<MessageScreen> {
     });
 
     try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
       final apiService = ApiService();
 
-      // 获取当前用户的消息
-      final response = await apiService.get(
-        '/api/messages/user/${userProvider.user?.id}',
-      );
-      final data = response.data;
+      // 使用 API 服务方法获取消息列表
+      final messages = await apiService.getUserMessages(page: 1, limit: 50);
 
-      if (data['success'] == true) {
-        final messages = data['data'] ?? [];
-        setState(() {
-          _messageList = messages
-              .map((item) => Message.fromJson(item))
-              .toList();
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(data['message'] ?? '加载消息失败'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
-      }
+      setState(() {
+        _messageList = messages
+            .map((item) => Message.fromJson(item))
+            .toList();
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -75,23 +56,20 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _markAsRead(String messageId) async {
     try {
       final apiService = ApiService();
-      final response = await apiService.put('/api/messages/$messageId/read');
-      final data = response.data;
+      await apiService.markMessageAsRead(messageId);
 
-      if (data['success'] == true) {
-        // 更新本地消息状态
-        setState(() {
-          final messageIndex = _messageList.indexWhere(
-            (msg) => msg.id == messageId,
+      // 更新本地消息状态
+      setState(() {
+        final messageIndex = _messageList.indexWhere(
+          (msg) => msg.id == messageId,
+        );
+        if (messageIndex != -1) {
+          _messageList[messageIndex] = _messageList[messageIndex].copyWith(
+            isRead: true,
+            readAt: DateTime.now(),
           );
-          if (messageIndex != -1) {
-            _messageList[messageIndex] = _messageList[messageIndex].copyWith(
-              isRead: true,
-              readAt: DateTime.now(),
-            );
-          }
-        });
-      }
+        }
+      });
     } catch (e) {
       // 标记已读失败不影响用户体验，静默处理
       debugPrint('标记消息已读失败: $e');
@@ -99,33 +77,43 @@ class _MessageScreenState extends State<MessageScreen> {
   }
 
   Future<void> _deleteMessage(String messageId) async {
+    // 显示确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: const Text('确定要删除这条消息吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
       final apiService = ApiService();
-      final response = await apiService.delete('/api/messages/$messageId');
-      final data = response.data;
-
-      if (data['success'] == true) {
-        setState(() {
-          _messageList.removeWhere((msg) => msg.id == messageId);
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('消息已删除'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(data['message'] ?? '删除消息失败'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
+      await apiService.deleteMessage(messageId);
+      setState(() {
+        _messageList.removeWhere((msg) => msg.id == messageId);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('消息已删除'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

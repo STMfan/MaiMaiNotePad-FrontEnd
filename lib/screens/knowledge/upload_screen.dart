@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
@@ -117,11 +118,28 @@ class _KnowledgeUploadScreenState extends State<KnowledgeUploadScreen> {
 
       // 添加文件
       for (var file in _selectedFiles) {
+        MultipartFile multipartFile;
+        if (kIsWeb) {
+          // Web 平台使用 bytes
+          if (file.bytes == null) {
+            throw Exception('文件数据不可用');
+          }
+          multipartFile = MultipartFile.fromBytes(
+            file.bytes!,
+            filename: file.name,
+          );
+        } else {
+          // 其他平台使用 path
+          if (file.path == null) {
+            throw Exception('文件路径不可用');
+          }
+          multipartFile = MultipartFile.fromFileSync(
+            file.path!,
+            filename: file.name,
+          );
+        }
         formData.files.add(
-          MapEntry(
-            'files',
-            MultipartFile.fromFileSync(file.path!, filename: file.name),
-          ),
+          MapEntry('files', multipartFile),
         );
       }
 

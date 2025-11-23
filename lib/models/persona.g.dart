@@ -7,31 +7,30 @@ part of 'persona.dart';
 // **************************************************************************
 
 Persona _$PersonaFromJson(Map<String, dynamic> json) => Persona(
-  id: json['id'] as String,
-  name: json['name'] as String,
-  description: json['description'] as String,
+  id: json['id'] as String? ?? '',
+  name: json['name'] as String? ?? '',
+  description: json['description'] as String? ?? '',
   content: json['content'] as String?,
-  uploaderId: json['uploaderId'] as String,
+  uploaderId: json['uploader_id'] as String? ?? '',
   author: json['author'] as String?,
-  authorId: json['authorId'] as String?,
+  authorId: json['author_id'] as String?,
   tags:
-      (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??
-      const [],
-  starCount: (json['starCount'] as num).toInt(),
+      (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
+  starCount: (json['star_count'] as num?)?.toInt() ?? 0,
   stars: (json['stars'] as num?)?.toInt() ?? 0,
-  isPublic: json['isPublic'] as bool,
-  fileNames: (json['fileNames'] as List<dynamic>)
-      .map((e) => e as String)
-      .toList(),
-  downloadUrl: json['downloadUrl'] as String?,
-  previewUrl: json['previewUrl'] as String?,
+  isPublic: json['is_public'] as bool? ?? false,
+  fileNames:
+      (json['file_names'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+      [],
+  downloadUrl: json['download_url'] as String?,
+  previewUrl: json['preview_url'] as String?,
   version: json['version'] as String?,
   size: (json['size'] as num?)?.toInt(),
   downloads: (json['downloads'] as num?)?.toInt(),
-  createdAt: DateTime.parse(json['createdAt'] as String),
-  updatedAt: json['updatedAt'] == null
-      ? null
-      : DateTime.parse(json['updatedAt'] as String),
+  createdAt: Persona._dateTimeFromJson(json['created_at']),
+  updatedAt: Persona._dateTimeFromJsonNullable(json['updated_at']),
 );
 
 Map<String, dynamic> _$PersonaToJson(Persona instance) => <String, dynamic>{
@@ -39,21 +38,21 @@ Map<String, dynamic> _$PersonaToJson(Persona instance) => <String, dynamic>{
   'name': instance.name,
   'description': instance.description,
   'content': instance.content,
-  'uploaderId': instance.uploaderId,
+  'uploader_id': instance.uploaderId,
   'author': instance.author,
-  'authorId': instance.authorId,
+  'author_id': instance.authorId,
   'tags': instance.tags,
-  'starCount': instance.starCount,
+  'star_count': instance.starCount,
   'stars': instance.stars,
-  'isPublic': instance.isPublic,
-  'fileNames': instance.fileNames,
-  'downloadUrl': instance.downloadUrl,
-  'previewUrl': instance.previewUrl,
+  'is_public': instance.isPublic,
+  'file_names': instance.fileNames,
+  'download_url': instance.downloadUrl,
+  'preview_url': instance.previewUrl,
   'version': instance.version,
   'size': instance.size,
   'downloads': instance.downloads,
-  'createdAt': instance.createdAt.toIso8601String(),
-  'updatedAt': instance.updatedAt?.toIso8601String(),
+  'created_at': instance.createdAt.toIso8601String(),
+  'updated_at': instance.updatedAt?.toIso8601String(),
 };
 
 PersonaUploadRequest _$PersonaUploadRequestFromJson(

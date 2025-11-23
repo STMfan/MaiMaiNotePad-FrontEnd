@@ -4,24 +4,38 @@ part 'persona.g.dart';
 
 @JsonSerializable()
 class Persona {
+  @JsonKey(defaultValue: '')
   final String id;
+  @JsonKey(defaultValue: '')
   final String name;
+  @JsonKey(defaultValue: '')
   final String description;
   final String? content;
+  @JsonKey(name: 'uploader_id', defaultValue: '')
   final String uploaderId;
   final String? author;
+  @JsonKey(name: 'author_id')
   final String? authorId;
+  @JsonKey(defaultValue: [])
   final List<String> tags;
+  @JsonKey(name: 'star_count', defaultValue: 0)
   final int starCount;
+  @JsonKey(defaultValue: 0)
   final int stars;
+  @JsonKey(name: 'is_public', defaultValue: false)
   final bool isPublic;
+  @JsonKey(name: 'file_names', defaultValue: [])
   final List<String> fileNames;
+  @JsonKey(name: 'download_url')
   final String? downloadUrl;
+  @JsonKey(name: 'preview_url')
   final String? previewUrl;
   final String? version;
   final int? size;
   final int? downloads;
+  @JsonKey(name: 'created_at', fromJson: _dateTimeFromJson)
   final DateTime createdAt;
+  @JsonKey(name: 'updated_at', fromJson: _dateTimeFromJsonNullable)
   final DateTime? updatedAt;
 
   // 添加便利属性
@@ -55,6 +69,33 @@ class Persona {
   factory Persona.fromJson(Map<String, dynamic> json) =>
       _$PersonaFromJson(json);
   Map<String, dynamic> toJson() => _$PersonaToJson(this);
+
+  // 辅助方法：处理日期时间解析，支持 null 和字符串格式
+  static DateTime _dateTimeFromJson(dynamic value) {
+    if (value == null) {
+      return DateTime.now();
+    }
+    if (value is String) {
+      return DateTime.parse(value);
+    }
+    if (value is DateTime) {
+      return value;
+    }
+    throw FormatException('Invalid date format: $value');
+  }
+
+  static DateTime? _dateTimeFromJsonNullable(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is String) {
+      return DateTime.parse(value);
+    }
+    if (value is DateTime) {
+      return value;
+    }
+    throw FormatException('Invalid date format: $value');
+  }
 }
 
 @JsonSerializable()

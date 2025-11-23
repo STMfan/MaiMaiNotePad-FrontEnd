@@ -78,8 +78,11 @@ flutter pub get
 
 3. **运行项目**
 ```bash
-# 运行在Chrome浏览器
+# 运行在Chrome浏览器（生产环境，默认地址）
 flutter run -d chrome
+
+# 运行在Chrome浏览器（开发环境，本地地址）
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:9278
 
 # 运行在Android设备
 flutter run -d android
@@ -106,19 +109,74 @@ flutter build web --release
 
 ## 📋 API文档
 
-项目使用RESTful API与后端通信，完整的API文档请参考 [API.md](API.md)。
+项目使用RESTful API与后端通信，完整的API文档请参考后端项目的 [API.md](../MaiMaiNotePad-BackEnd/docs/API.md)。
 
 ### 基础配置
-- **API地址**: 可配置，默认为 `http://localhost:9278`
+- **API地址**: 可配置，默认为 `http://127.0.0.1:9278`（开发环境）
 - **认证方式**: Bearer Token (JWT)
 - **支持格式**: JSON 和表单数据
 
+### 最新更新（2025-11-23）
+
+**新增接口支持**：
+- `GET /api/knowledge/{kb_id}/starred` - 检查知识库Star状态
+- `GET /api/persona/{pc_id}/starred` - 检查人设卡Star状态
+- `GET /api/user/stars?include_details={bool}` - 获取用户Star记录（支持包含详情）
+- `GET /api/knowledge/public` - 支持分页、搜索、筛选、排序
+- `GET /api/persona/public` - 支持分页、搜索、筛选、排序
+
+**性能优化**：
+- Star状态检查：从获取所有Star记录 → 单次API调用
+- "我的收藏"页面：从 1+N 次请求 → 1 次请求（使用 `includeDetails=true`）
+- 公开列表：支持分页加载，减少初始加载时间
+
+详细更新内容请参考 [CHANGELOG.md](docs/CHANGELOG.md)。
+
+### 环境配置
+
+项目支持通过编译时参数配置不同的API地址：
+
+**开发环境（本地开发）：**
+```bash
+# 运行
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:9278
+
+# 构建
+flutter build web --dart-define=API_BASE_URL=http://localhost:9278
+```
+
+**生产环境（默认）：**
+```bash
+# 运行（使用默认生产地址）
+flutter run -d chrome
+
+# 构建
+flutter build web --release
+```
+
+**使用构建脚本（推荐）：**
+```bash
+# Windows
+scripts\run_dev.bat      # 开发环境运行
+scripts\build_dev.bat    # 开发环境构建
+scripts\build_prod.bat   # 生产环境构建
+
+# Linux/Mac
+chmod +x scripts/*.sh
+./scripts/run_dev.sh     # 开发环境运行
+./scripts/build_dev.sh   # 开发环境构建
+./scripts/build_prod.sh  # 生产环境构建
+```
+
+**注意**：管理员用户可以在应用内通过"服务器设置"功能动态修改API地址，无需重新编译。
+
 ### 主要接口
 - 🔐 用户认证（登录/注册/验证）
-- 📚 知识库管理（上传/浏览/Star）
-- 👤 人设卡管理（上传/浏览/Star）
-- ✅ 审核管理（待审核/通过/拒绝）
-- 💬 消息管理（发送/接收/已读）
+- 📚 知识库管理（上传/浏览/Star/分页）
+- 👤 人设卡管理（上传/浏览/Star/分页）
+- ⭐ Star功能（状态检查、收藏列表）
+- ✅ 审核管理（待审核/通过/拒绝/分页）
+- 💬 消息管理（发送/接收/已读/分页）
 - 📧 邮件服务（配置/发送）
 
 ## 🎨 项目结构
@@ -179,7 +237,14 @@ A: 检查后端服务是否正常运行，确认API地址配置正确，查看�
 A: 确认文件格式是否符合要求（知识库：txt/json，人设卡：toml），检查网络连接。
 
 ### Q: 如何修改API地址？
-A: 在应用设置中可以配置自定义API地址，支持本地开发和远程服务器。
+A: 有两种方式：
+1. **编译时配置**：使用 `--dart-define=API_BASE_URL=地址` 参数（推荐用于开发/生产环境切换）
+2. **运行时配置**：管理员用户可以在应用的"服务器设置"中动态修改（无需重新编译）
+
+### Q: 如何区分开发和生产环境？
+A: 使用构建脚本或编译参数：
+- 开发环境：`flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:9278`
+- 生产环境：`flutter run -d chrome`（使用默认地址）
 
 ## 🤝 贡献指南
 

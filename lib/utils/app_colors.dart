@@ -11,6 +11,12 @@ class AppColors {
     return Theme.of(context).colorScheme.onSurface;
   }
 
+  /// 获取极透明文本颜色
+  /// alpha: 0.1 - 用于背景色
+  static Color onSurfaceWithOpacity01(BuildContext context) {
+    return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1);
+  }
+
   /// 获取半透明文本颜色
   /// alpha: 0.5 - 用于次要文本
   static Color onSurfaceWithOpacity05(BuildContext context) {

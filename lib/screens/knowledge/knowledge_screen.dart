@@ -80,28 +80,26 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
 
     try {
       final apiService = ApiService();
-      final response = await apiService.get('/api/knowledge/public');
-      final data = response.data;
-
-      if (data['success'] == true) {
-        setState(() {
-          _knowledgeList = List<Map<String, dynamic>>.from(data['data'] ?? []);
-          _filteredKnowledgeList = _knowledgeList;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(data['message'] ?? '加载知识库失败'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
-      }
+      final response = await apiService.getPublicKnowledge();
+      
+      setState(() {
+        _knowledgeList = response.items.map((kb) => {
+          'id': kb.id,
+          'name': kb.name,
+          'description': kb.description,
+          'uploader_id': kb.uploaderId,
+          'star_count': kb.starCount,
+          'is_public': kb.isPublic,
+          'is_pending': kb.isPending,
+          'created_at': kb.createdAt.toIso8601String(),
+          'updated_at': kb.updatedAt?.toIso8601String(),
+          'file_names': kb.fileNames,
+          'download_url': kb.downloadUrl,
+          'preview_url': kb.previewUrl,
+        }).toList();
+        _filteredKnowledgeList = _knowledgeList;
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;

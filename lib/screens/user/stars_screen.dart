@@ -46,7 +46,7 @@ class _StarsScreenState extends State<StarsScreen>
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final apiService = ApiService();
 
-      final starsData = await apiService.getUserStars(userProvider.token!);
+      final starsData = await apiService.getUserStars(userProvider.token!, includeDetails: true);
 
       setState(() {
         _starredKnowledge = starsData['knowledge'] ?? [];

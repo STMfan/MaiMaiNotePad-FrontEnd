@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import '../../services/api_service.dart';
+import 'user_management_tab_content.dart';
+import 'content_management_tab_content.dart';
+import 'message_management_tab_content.dart';
 
 class AdminOverviewTabContent extends StatefulWidget {
   const AdminOverviewTabContent({super.key});
@@ -14,6 +18,7 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  late TabController _tabController;
 
   bool _isLoading = true;
   Map<String, dynamic> _stats = {};
@@ -24,6 +29,9 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
   @override
   void initState() {
     super.initState();
+
+    // 初始化标签控制器
+    _tabController = TabController(length: 4, vsync: this);
 
     // 初始化动画控制器
     _animationController = AnimationController(
@@ -53,6 +61,7 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
   @override
   void dispose() {
     _animationController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -93,30 +102,90 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
       final apiService = ApiService();
       final response = await apiService.get('/api/admin/stats');
       final data = response.data;
-
+      
+      // 添加调试日志
+      debugPrint('Admin stats API response: $data');
+      
       if (data['success'] == true) {
+        final responseData = data['data'];
+        
+        // 检查是否包含错误信息（权限错误等）
+        if (responseData is Map && responseData.containsKey('detail')) {
+          // 这是错误信息，不是数据
+          debugPrint('API returned error: ${responseData['detail']}');
+          if (mounted) {
+            setState(() {
+              _stats = {};
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('权限错误: ${responseData['detail']}'),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+          return; // 不继续处理
+        }
+        
         setState(() {
-          _stats = data['data'] ?? {};
+          _stats = responseData ?? {};
         });
+        debugPrint('Stats loaded successfully: $_stats');
+      } else {
+        // 处理API返回失败的情况
+        debugPrint('API returned success=false: ${data['message'] ?? 'Unknown error'}');
+        if (mounted) {
+          setState(() {
+            _stats = {};
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('获取统计数据失败: ${data['message'] ?? '未知错误'}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
-    } catch (e) {
-      // 静默处理错误
+    } catch (e, stackTrace) {
+      // 不再静默处理，显示错误信息并添加调试日志
+      debugPrint('Error loading stats: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _stats = {};
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载统计数据失败: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            action: SnackBarAction(
+              label: '重试',
+              onPressed: _loadStats,
+            ),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _loadPendingKnowledge() async {
     try {
       final apiService = ApiService();
-      final response = await apiService.get('/api/admin/pending/knowledge');
-      final data = response.data;
-
-      if (data['success'] == true) {
-        setState(() {
-          _pendingKnowledge = List<Map<String, dynamic>>.from(
-            data['data'] ?? [],
-          );
-        });
-      }
+      // 使用正确的审核接口路径
+      final response = await apiService.getPendingKnowledge();
+      setState(() {
+        _pendingKnowledge = response.items
+            .map((kb) => {
+                  'id': kb.id,
+                  'name': kb.name,
+                  'title': kb.name, // 兼容旧代码
+                  'description': kb.description,
+                  'uploader_id': kb.uploaderId,
+                  'creatorName': kb.uploaderId, // 暂时使用uploaderId，实际应该从用户信息获取
+                  'createdAt': kb.createdAt.toIso8601String(),
+                })
+            .toList();
+      });
     } catch (e) {
       // 静默处理错误
     }
@@ -125,16 +194,20 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
   Future<void> _loadPendingPersonas() async {
     try {
       final apiService = ApiService();
-      final response = await apiService.get('/api/admin/pending/personas');
-      final data = response.data;
-
-      if (data['success'] == true) {
-        setState(() {
-          _pendingPersonas = List<Map<String, dynamic>>.from(
-            data['data'] ?? [],
-          );
-        });
-      }
+      // 使用正确的审核接口路径
+      final response = await apiService.getPendingPersonas();
+      final personaList = response.items;
+      setState(() {
+        _pendingPersonas = personaList
+            .map((pc) => {
+                  'id': pc.id,
+                  'name': pc.name,
+                  'description': pc.description,
+                  'uploader_id': pc.uploaderId,
+                  'createdAt': pc.createdAt.toIso8601String(),
+                })
+            .toList();
+      });
     } catch (e) {
       // 静默处理错误
     }
@@ -143,40 +216,106 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
   Future<void> _loadRecentUsers() async {
     try {
       final apiService = ApiService();
-      final response = await apiService.get('/api/admin/recent-users');
+      final response = await apiService.get('/api/admin/recent-users?limit=10');
       final data = response.data;
-
+      
+      // 添加调试日志
+      debugPrint('Recent users API response: $data');
+      
       if (data['success'] == true) {
-        setState(() {
-          _recentUsers = List<Map<String, dynamic>>.from(data['data'] ?? []);
-        });
+        final responseData = data['data'];
+        
+        // 检查是否包含错误信息（权限错误等）
+        if (responseData is Map && responseData.containsKey('detail')) {
+          // 这是错误信息，不是数据
+          debugPrint('API returned error: ${responseData['detail']}');
+          if (mounted) {
+            setState(() {
+              _recentUsers = [];
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('权限错误: ${responseData['detail']}'),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+          return; // 不继续处理
+        }
+        
+        // 检查 data['data'] 的类型，确保它是 List
+        final dataList = responseData;
+        if (dataList is List) {
+          setState(() {
+            _recentUsers = List<Map<String, dynamic>>.from(
+              dataList.map((item) => item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item))
+            );
+          });
+          debugPrint('Recent users loaded successfully: ${_recentUsers.length} users');
+        } else if (dataList is Map) {
+          // 如果返回的是 Map，可能是单个对象，转换为列表
+          debugPrint('Warning: API returned Map instead of List, converting to List');
+          setState(() {
+            _recentUsers = [Map<String, dynamic>.from(dataList)];
+          });
+          debugPrint('Recent users loaded (converted from Map): ${_recentUsers.length} users');
+        } else {
+          // 如果既不是 List 也不是 Map，设置为空列表
+          debugPrint('Warning: API returned unexpected data type: ${dataList.runtimeType}');
+          setState(() {
+            _recentUsers = [];
+          });
+        }
+      } else {
+        // 处理API返回失败的情况
+        debugPrint('API returned success=false: ${data['message'] ?? 'Unknown error'}');
+        if (mounted) {
+          setState(() {
+            _recentUsers = [];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('获取最近用户失败: ${data['message'] ?? '未知错误'}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
-    } catch (e) {
-      // 静默处理错误
+    } catch (e, stackTrace) {
+      // 不再静默处理，显示错误信息并添加调试日志
+      debugPrint('Error loading recent users: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _recentUsers = [];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载最近用户失败: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            action: SnackBarAction(
+              label: '重试',
+              onPressed: _loadRecentUsers,
+            ),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _approveKnowledge(String id) async {
     try {
       final apiService = ApiService();
-      final response = await apiService.post(
-        '/api/admin/approve/knowledge/$id',
-        data: {},
+      // 使用正确的审核接口路径
+      await apiService.approveKnowledge(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('知识库审核通过'),
+          backgroundColor: Colors.green,
+        ),
       );
-      final data = response.data;
-
-      if (data['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('知识库审核通过'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadPendingKnowledge();
-        _loadStats();
-      } else {
-        _showError(data['message'] ?? '审核失败');
-      }
+      _loadPendingKnowledge();
+      _loadStats();
     } catch (e) {
       _showError('审核失败: $e');
     }
@@ -185,23 +324,15 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
   Future<void> _rejectKnowledge(String id) async {
     try {
       final apiService = ApiService();
-      final response = await apiService.post(
-        '/api/admin/reject/knowledge/$id',
-        data: {},
+      // 使用正确的审核接口路径
+      await apiService.rejectKnowledge(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('知识库已拒绝'),
+          backgroundColor: Colors.orange,
+        ),
       );
-      final data = response.data;
-
-      if (data['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('知识库已拒绝'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        _loadPendingKnowledge();
-      } else {
-        _showError(data['message'] ?? '拒绝失败');
-      }
+      _loadPendingKnowledge();
     } catch (e) {
       _showError('拒绝失败: $e');
     }
@@ -210,24 +341,16 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
   Future<void> _approvePersona(String id) async {
     try {
       final apiService = ApiService();
-      final response = await apiService.post(
-        '/api/admin/approve/persona/$id',
-        data: {},
+      // 使用正确的审核接口路径
+      await apiService.approvePersona(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('人格审核通过'),
+          backgroundColor: Colors.green,
+        ),
       );
-      final data = response.data;
-
-      if (data['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('人格审核通过'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadPendingPersonas();
-        _loadStats();
-      } else {
-        _showError(data['message'] ?? '审核失败');
-      }
+      _loadPendingPersonas();
+      _loadStats();
     } catch (e) {
       _showError('审核失败: $e');
     }
@@ -236,23 +359,15 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
   Future<void> _rejectPersona(String id) async {
     try {
       final apiService = ApiService();
-      final response = await apiService.post(
-        '/api/admin/reject/persona/$id',
-        data: {},
+      // 使用正确的审核接口路径
+      await apiService.rejectPersona(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('人格已拒绝'),
+          backgroundColor: Colors.orange,
+        ),
       );
-      final data = response.data;
-
-      if (data['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('人格已拒绝'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        _loadPendingPersonas();
-      } else {
-        _showError(data['message'] ?? '拒绝失败');
-      }
+      _loadPendingPersonas();
     } catch (e) {
       _showError('拒绝失败: $e');
     }
@@ -267,13 +382,271 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
     );
   }
 
+  Future<void> _showSendBroadcastDialog() async {
+    final titleController = TextEditingController();
+    final summaryController = TextEditingController();
+    final contentController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('发送系统公告'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: '标题 *',
+                    border: OutlineInputBorder(),
+                    hintText: '请输入公告标题',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '标题不能为空';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: summaryController,
+                  decoration: const InputDecoration(
+                    labelText: '简介（可选）',
+                    border: OutlineInputBorder(),
+                    hintText: '请输入消息简介，用于列表预览',
+                    helperText: '如果不填写，将自动从内容生成',
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: contentController,
+                  decoration: const InputDecoration(
+                    labelText: '详细内容 *',
+                    border: OutlineInputBorder(),
+                    hintText: '请输入公告详细内容（支持Markdown格式）',
+                  ),
+                  maxLines: 8,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '内容不能为空';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '此公告将发送给所有用户',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(dialogContext).pop(true);
+              }
+            },
+            child: const Text('发送'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && mounted) {
+      try {
+        final apiService = ApiService();
+        await apiService.sendMessage(
+          title: titleController.text.trim(),
+          content: contentController.text.trim(),
+          summary: summaryController.text.trim().isNotEmpty
+              ? summaryController.text.trim()
+              : null,
+          asAnnouncement: true,
+          broadcastAll: true,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('系统公告发送成功'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+          // 刷新数据
+          _loadAdminData();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('发送失败: $e'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showSendBroadcastDialogOld() async {
+    final titleController = TextEditingController();
+    final summaryController = TextEditingController();
+    final contentController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('发送系统公告'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: '标题 *',
+                    border: OutlineInputBorder(),
+                    hintText: '请输入公告标题',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '标题不能为空';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: summaryController,
+                  decoration: const InputDecoration(
+                    labelText: '简介（可选）',
+                    border: OutlineInputBorder(),
+                    hintText: '请输入消息简介，用于列表预览',
+                    helperText: '如果不填写，将自动从内容生成',
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: contentController,
+                  decoration: const InputDecoration(
+                    labelText: '详细内容 *',
+                    border: OutlineInputBorder(),
+                    hintText: '请输入公告详细内容（支持Markdown格式）',
+                  ),
+                  maxLines: 8,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '内容不能为空';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '此公告将发送给所有用户',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(dialogContext).pop(true);
+              }
+            },
+            child: const Text('发送'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && mounted) {
+      try {
+        final apiService = ApiService();
+        await apiService.sendMessage(
+          title: titleController.text.trim(),
+          content: contentController.text.trim(),
+          summary: summaryController.text.trim().isNotEmpty
+              ? summaryController.text.trim()
+              : null,
+          asAnnouncement: true,
+          broadcastAll: true,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('系统公告发送成功'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          _showError('发送失败: $e');
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      body: _isLoading
+      body: Column(
+        children: [
+          // 标签栏
+          TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: '概览'),
+              Tab(text: '用户管理'),
+              Tab(text: '内容管理'),
+              Tab(text: '消息管理'),
+            ],
+          ),
+          // 标签页内容
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // 概览标签页
+                _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadAdminData,
@@ -282,15 +655,33 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 标题
+                    // 标题和发送公告按钮
                     FadeTransition(
                       opacity: _fadeAnimation,
-                      child: Text(
-                        '管理员概览',
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '管理员概览',
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _showSendBroadcastDialog,
+                            icon: const Icon(Icons.campaign),
+                            label: const Text('发送系统公告'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorScheme.primary,
+                              foregroundColor: colorScheme.onPrimary,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -300,21 +691,37 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
                     const SizedBox(height: 24),
 
                     // 待审核内容
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 待审核知识库
-                        Expanded(
-                          flex: 3,
-                          child: _buildPendingKnowledgeSection(),
-                        ),
-                        const SizedBox(width: 16),
-                        // 待审核人格
-                        Expanded(
-                          flex: 2,
-                          child: _buildPendingPersonasSection(),
-                        ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        // 在小屏幕上垂直排列，大屏幕上水平排列
+                        if (constraints.maxWidth < 800) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildPendingKnowledgeSection(),
+                              const SizedBox(height: 16),
+                              _buildPendingPersonasSection(),
+                            ],
+                          );
+                        } else {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 待审核知识库
+                              Expanded(
+                                flex: 3,
+                                child: _buildPendingKnowledgeSection(),
+                              ),
+                              const SizedBox(width: 16),
+                              // 待审核人格
+                              Expanded(
+                                flex: 2,
+                                child: _buildPendingPersonasSection(),
+                              ),
+                            ],
+                          );
+                        }
+                      },
                     ),
                     const SizedBox(height: 24),
 
@@ -323,6 +730,17 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
                   ],
                 ),
               ),
+                      ),
+                // 用户管理标签页
+                const UserManagementTabContent(),
+                // 内容管理标签页
+                const ContentManagementTabContent(),
+                // 消息管理标签页
+                const MessageManagementTabContent(),
+              ],
+            ),
+          ),
+        ],
             ),
     );
   }
@@ -330,6 +748,16 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
   Widget _buildStatsCards() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // 根据屏幕宽度动态调整列数
+    final crossAxisCount = screenWidth > 1200
+        ? 4
+        : screenWidth > 800
+            ? 3
+            : screenWidth > 600
+                ? 2
+                : 1;
 
     final stats = [
       {
@@ -366,8 +794,8 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
       child: GridView.count(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 4,
-        childAspectRatio: 1.5,
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: crossAxisCount == 1 ? 3.0 : 1.5,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
         children: stats.map((stat) {
@@ -583,13 +1011,13 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: () => _rejectKnowledge(knowledge['_id']),
+                onPressed: () => _rejectKnowledge(knowledge['id']),
                 style: TextButton.styleFrom(foregroundColor: colorScheme.error),
                 child: const Text('拒绝'),
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () => _approveKnowledge(knowledge['_id']),
+                onPressed: () => _approveKnowledge(knowledge['id']),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
@@ -737,13 +1165,13 @@ class _AdminOverviewTabContentState extends State<AdminOverviewTabContent>
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: () => _rejectPersona(persona['_id']),
+                onPressed: () => _rejectPersona(persona['id']),
                 style: TextButton.styleFrom(foregroundColor: colorScheme.error),
                 child: const Text('拒绝'),
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () => _approvePersona(persona['_id']),
+                onPressed: () => _approvePersona(persona['id']),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.secondary,
                   foregroundColor: colorScheme.onSecondary,
