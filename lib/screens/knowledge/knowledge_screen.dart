@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
@@ -21,8 +23,26 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
   List<Map<String, dynamic>> _knowledgeList = [];
   List<Map<String, dynamic>> _filteredKnowledgeList = [];
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _uploaderController = TextEditingController();
   String _selectedSortOption = '最新发布';
   String _selectedCategory = '全部分类';
+  String _selectedOrder = 'desc';
+  final List<Map<String, String>> _sortOptions = const [
+    {'label': '最新发布', 'sortBy': 'created_at', 'sortOrder': 'desc'},
+    {'label': '最早发布', 'sortBy': 'created_at', 'sortOrder': 'asc'},
+    {'label': '更新时间降序', 'sortBy': 'updated_at', 'sortOrder': 'desc'},
+    {'label': '更新时间升序', 'sortBy': 'updated_at', 'sortOrder': 'asc'},
+    {'label': '名称升序', 'sortBy': 'name', 'sortOrder': 'asc'},
+    {'label': '名称降序', 'sortBy': 'name', 'sortOrder': 'desc'},
+    {'label': '下载量降序', 'sortBy': 'downloads', 'sortOrder': 'desc'},
+    {'label': '收藏数降序', 'sortBy': 'star_count', 'sortOrder': 'desc'},
+  ];
+  String _searchQuery = '';
+  String _uploaderQuery = '';
+  String _currentSortBy = 'created_at';
+  String _currentSortOrder = 'desc';
+  Timer? _searchDebounce;
+  static const _searchDebounceDuration = Duration(milliseconds: 450);
   bool _isGridView = true;
 
   // 添加用户登录状态检查
@@ -62,6 +82,8 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
   void dispose() {
     _animationController.dispose();
     _searchController.dispose();
+    _uploaderController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -73,22 +95,32 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
     });
   }
 
-  Future<void> _loadKnowledgeList() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _loadKnowledgeList({bool showLoadingIndicator = true}) async {
+    if (showLoadingIndicator) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final apiService = ApiService();
-      final response = await apiService.getPublicKnowledge();
-      
-      setState(() {
-        _knowledgeList = response.items.map((kb) => {
+      final response = await apiService.getPublicKnowledge(
+        name: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+        uploaderId: _uploaderQuery.trim().isEmpty ? null : _uploaderQuery.trim(),
+        sortBy: _currentSortBy,
+        sortOrder: _currentSortOrder,
+      );
+
+      final items = response.items.map((kb) {
+        final starCount = kb.starCount;
+        return {
           'id': kb.id,
           'name': kb.name,
           'description': kb.description,
           'uploader_id': kb.uploaderId,
-          'star_count': kb.starCount,
+          'copyright_owner': kb.copyrightOwner,
+          'star_count': starCount,
+          'stars': starCount,
           'is_public': kb.isPublic,
           'is_pending': kb.isPending,
           'created_at': kb.createdAt.toIso8601String(),
@@ -96,79 +128,108 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
           'file_names': kb.fileNames,
           'download_url': kb.downloadUrl,
           'preview_url': kb.previewUrl,
-        }).toList();
-        _filteredKnowledgeList = _knowledgeList;
+          'tags': kb.tags,
+        };
+      }).toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        _knowledgeList = items;
+        _filteredKnowledgeList = _applyLocalFilters(items);
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('加载知识库失败: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('加载知识库失败: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     }
   }
 
-  void _filterKnowledgeList(String query) {
-    setState(() {
-      _filteredKnowledgeList = _knowledgeList.where((knowledge) {
+  List<Map<String, dynamic>> _applyLocalFilters(
+    List<Map<String, dynamic>> source,
+  ) {
+    var result = List<Map<String, dynamic>>.from(source);
+    final query = _searchQuery.trim().toLowerCase();
+
+    if (query.isNotEmpty) {
+      result = result.where((knowledge) {
         final name = knowledge['name']?.toString().toLowerCase() ?? '';
         final description =
             knowledge['description']?.toString().toLowerCase() ?? '';
-        final searchQuery = query.toLowerCase();
-        return name.contains(searchQuery) || description.contains(searchQuery);
+        return name.contains(query) || description.contains(query);
       }).toList();
+    }
+
+    if (_selectedCategory != '全部分类') {
+      result = result.where((knowledge) {
+        final tags = knowledge['tags'] as List<dynamic>? ?? [];
+        return tags.contains(_selectedCategory);
+      }).toList();
+    }
+
+    return result;
+  }
+
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+      _filteredKnowledgeList = _applyLocalFilters(_knowledgeList);
+    });
+
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      _searchDebounceDuration,
+      () => _loadKnowledgeList(showLoadingIndicator: false),
+    );
+  }
+
+  void _onUploaderChanged(String value) {
+    setState(() {
+      _uploaderQuery = value;
     });
   }
 
-  void _sortKnowledgeList(String sortOption) {
+  void _applyUploaderFilter() {
+    _loadKnowledgeList();
+  }
+
+  void _onSortOptionSelected(String sortOption) {
+    final config = _sortOptions.firstWhere(
+      (opt) => opt['label'] == sortOption,
+      orElse: () => _sortOptions.first,
+    );
     setState(() {
       _selectedSortOption = sortOption;
-      switch (sortOption) {
-        case '最新发布':
-          _filteredKnowledgeList.sort((a, b) {
-            final aTime =
-                DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
-            final bTime =
-                DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
-            return bTime.compareTo(aTime);
-          });
-          break;
-        case '最多收藏':
-          _filteredKnowledgeList.sort((a, b) {
-            final aStars = int.tryParse(a['stars']?.toString() ?? '0') ?? 0;
-            final bStars = int.tryParse(b['stars']?.toString() ?? '0') ?? 0;
-            return bStars.compareTo(aStars);
-          });
-          break;
-        case '名称排序':
-          _filteredKnowledgeList.sort((a, b) {
-            final aName = a['name']?.toString() ?? '';
-            final bName = b['name']?.toString() ?? '';
-            return aName.compareTo(bName);
-          });
-          break;
-      }
+      _currentSortBy = config['sortBy']!;
+      _currentSortOrder = config['sortOrder']!;
     });
+    _loadKnowledgeList();
+  }
+
+  Map<String, String> _resolveSortConfig(String sortOption) {
+    switch (sortOption) {
+      case '最多收藏':
+        return {'sortBy': 'star_count', 'sortOrder': 'desc'};
+      case '名称排序':
+        return {'sortBy': 'name', 'sortOrder': 'asc'};
+      case '最新发布':
+      default:
+        return {'sortBy': 'created_at', 'sortOrder': 'desc'};
+    }
   }
 
   void _filterByCategory(String category) {
     setState(() {
       _selectedCategory = category;
-      if (category == '全部分类') {
-        _filteredKnowledgeList = List.from(_knowledgeList);
-      } else {
-        _filteredKnowledgeList = _knowledgeList.where((knowledge) {
-          final tags = knowledge['tags'] as List<dynamic>? ?? [];
-          return tags.contains(category);
-        }).toList();
-      }
+      _filteredKnowledgeList = _applyLocalFilters(_knowledgeList);
     });
   }
 
@@ -246,7 +307,29 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
                           vertical: 16,
                         ),
                       ),
-                      onChanged: _filterKnowledgeList,
+                      onChanged: _onSearchChanged,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _uploaderController,
+                      decoration: InputDecoration(
+                        hintText: '按上传者ID筛选',
+                        prefixIcon: const Icon(Icons.person_search),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.filter_alt),
+                          tooltip: '应用上传者筛选',
+                          onPressed: _applyUploaderFilter,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                      onChanged: _onUploaderChanged,
+                      onSubmitted: (_) => _applyUploaderFilter(),
                     ),
                     const SizedBox(height: 16),
                     // 筛选选项
@@ -306,7 +389,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
                                 .toList(),
                             onChanged: (value) {
                               if (value != null) {
-                                _sortKnowledgeList(value);
+                                _onSortOptionSelected(value);
                               }
                             },
                           ),
@@ -355,7 +438,8 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
                         ),
                       )
                     : RefreshIndicator(
-                        onRefresh: _loadKnowledgeList,
+                        onRefresh: () =>
+                            _loadKnowledgeList(showLoadingIndicator: false),
                         child: _isGridView
                             ? _buildGridView(isDesktop, isTablet)
                             : _buildListView(),
@@ -451,7 +535,8 @@ class KnowledgeCard extends StatelessWidget {
     final theme = Theme.of(context);
     final name = knowledge['name']?.toString() ?? '未命名';
     final description = knowledge['description']?.toString() ?? '暂无描述';
-    final starCount = knowledge['stars']?.toString() ?? '0';
+    final starCount =
+        (knowledge['star_count'] ?? knowledge['stars'] ?? 0).toString();
     final uploaderId = knowledge['uploader_id']?.toString() ?? '未知用户';
     final copyrightOwner = knowledge['copyright_owner']?.toString();
 

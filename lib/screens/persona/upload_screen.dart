@@ -106,13 +106,21 @@ class _PersonaUploadScreenState extends State<PersonaUploadScreen> {
     try {
       final apiService = ApiService();
 
+      final tags = _tagsController.text
+          .split(',')
+          .map((tag) => tag.trim())
+          .where((tag) => tag.isNotEmpty)
+          .toList();
+
       // 创建元数据 - 根据API.md要求
       final metadata = {
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
+        'content': _descriptionController.text.trim(), // 直接存库，替代 metadata 文件
         'copyright_owner': _authorController.text.trim().isNotEmpty
             ? _authorController.text.trim()
             : '',
+        'tags': tags.join(','),
         'isPublic': 'false', // 默认不公开，需要审核
       };
 
@@ -153,7 +161,14 @@ class _PersonaUploadScreenState extends State<PersonaUploadScreen> {
 
       final response = await apiService.upload('/api/persona/upload', formData);
 
-      if (response.data['success'] == true) {
+      final statusOk = (response.statusCode ?? 500) < 300;
+      final data = response.data;
+      // 后端直接返回人设卡对象，无 success 包装，存在 id 即视为成功
+      final success = data != null &&
+          ((data is Map && (data['success'] == true || data['id'] != null)) ||
+              data is! Map);
+
+      if (statusOk && success) {
         _showSuccess('人设卡上传成功，等待审核');
         _clearForm();
 
@@ -164,7 +179,7 @@ class _PersonaUploadScreenState extends State<PersonaUploadScreen> {
           }
         });
       } else {
-        _showError(response.data['message'] ?? '上传失败');
+        _showError('上传失败');
       }
     } catch (e) {
       _showError('上传失败: $e');

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../utils/app_router.dart';
+import '../../models/knowledge.dart';
+import '../../models/persona.dart';
 
 class ContentManagementTabContent extends StatefulWidget {
   const ContentManagementTabContent({super.key});
@@ -15,6 +18,16 @@ class _ContentManagementTabContentState
   final ApiService _apiService = ApiService();
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _uploaderController = TextEditingController();
+
+  static const List<Map<String, String>> _sortOptions = [
+    {'value': 'created_at', 'label': '创建时间'},
+    {'value': 'updated_at', 'label': '更新时间'},
+    {'value': 'star_count', 'label': '点赞数'},
+    {'value': 'name', 'label': '名称'},
+    {'value': 'downloads', 'label': '下载量'},
+    {'value': 'is_public', 'label': '公开状态'},
+  ];
 
   List<Map<String, dynamic>> _knowledgeBases = [];
   List<Map<String, dynamic>> _personas = [];
@@ -22,6 +35,9 @@ class _ContentManagementTabContentState
   String? _error;
   String? _searchQuery;
   String? _statusFilter;
+  String? _uploaderFilter;
+  String _orderBy = 'created_at';
+  String _orderDir = 'desc';
   int _currentPage = 1;
   int _totalPages = 1;
   int _total = 0;
@@ -42,6 +58,7 @@ class _ContentManagementTabContentState
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _uploaderController.dispose();
     super.dispose();
   }
 
@@ -66,12 +83,18 @@ class _ContentManagementTabContentState
               limit: 20,
               status: _statusFilter,
               search: _searchQuery,
+              uploader: _uploaderFilter,
+              orderBy: _orderBy,
+              orderDir: _orderDir,
             )
           : await _apiService.getAllPersonas(
               page: _currentPage,
               limit: 20,
               status: _statusFilter,
               search: _searchQuery,
+              uploader: _uploaderFilter,
+              orderBy: _orderBy,
+              orderDir: _orderDir,
             );
 
       final data = response.data['data'];
@@ -125,6 +148,35 @@ class _ContentManagementTabContentState
   void _onStatusFilterChanged(String? status) {
     setState(() {
       _statusFilter = status;
+    });
+    _loadContent(resetPage: true);
+  }
+
+  void _onUploaderFilterSubmitted(String value) {
+    final trimmed = value.trim();
+    setState(() {
+      _uploaderFilter = trimmed.isEmpty ? null : trimmed;
+    });
+    _loadContent(resetPage: true);
+  }
+
+  void _clearUploaderFilter() {
+    _uploaderController.clear();
+    _onUploaderFilterSubmitted('');
+  }
+
+  void _onOrderByChanged(String? value) {
+    if (value == null || value == _orderBy) return;
+    setState(() {
+      _orderBy = value;
+    });
+    _loadContent(resetPage: true);
+  }
+
+  void _onOrderDirChanged(String value) {
+    if (value == _orderDir) return;
+    setState(() {
+      _orderDir = value;
     });
     _loadContent(resetPage: true);
   }
@@ -333,7 +385,26 @@ class _ContentManagementTabContentState
                       : null,
                   border: const OutlineInputBorder(),
                 ),
+                onChanged: (_) => setState(() {}),
                 onSubmitted: _onSearch,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _uploaderController,
+                decoration: InputDecoration(
+                  labelText: '上传者（ID 或用户名）',
+                  prefixIcon: const Icon(Icons.person_search),
+                  suffixIcon: _uploaderController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: _clearUploaderFilter,
+                        )
+                      : null,
+                  border: const OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: _onUploaderFilterSubmitted,
               ),
               const SizedBox(height: 12),
               Row(
@@ -361,6 +432,49 @@ class _ContentManagementTabContentState
                       onSelectionChanged: (Set<String?> selection) {
                         _onStatusFilterChanged(selection.first);
                       },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _orderBy,
+                      decoration: const InputDecoration(
+                        labelText: '排序字段',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _sortOptions
+                          .map(
+                            (option) => DropdownMenuItem<String>(
+                              value: option['value'],
+                              child: Text(option['label'] ?? ''),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _onOrderByChanged,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('排序方向'),
+                        const SizedBox(height: 4),
+                        SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(value: 'desc', label: Text('降序')),
+                            ButtonSegment(value: 'asc', label: Text('升序')),
+                          ],
+                          selected: {_orderDir},
+                          onSelectionChanged: (selection) {
+                            _onOrderDirChanged(selection.first);
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -472,6 +586,80 @@ class _ContentManagementTabContentState
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit),
+                                        tooltip: '编辑',
+                                        onPressed: () async {
+                                          if (_isKnowledgeTab) {
+                                            final knowledgeMap = {
+                                              'id': item['id'] ?? '',
+                                              'name': item['name'] ?? '',
+                                              'description': item['description'] ?? '',
+                                              'uploader_id': item['uploader_id'] ?? item['uploader'] ?? '',
+                                              'copyright_owner': item['copyright_owner'],
+                                              'star_count': item['star_count'] ?? 0,
+                                              'is_public': item['is_public'] ?? false,
+                                              'is_pending': item['is_pending'] ?? (item['status'] == 'pending'),
+                                              'file_names': item['file_names'] ?? <String>[],
+                                              'files': item['files'] ?? <dynamic>[],
+                                              'created_at': item['created_at'] ?? item['createdAt'] ?? DateTime.now().toIso8601String(),
+                                              'updated_at': item['updated_at'] ?? item['updatedAt'],
+                                              'author': item['author'] ?? item['uploader_name'],
+                                              'author_id': item['author_id'] ?? item['uploader_id'],
+                                              'content': item['content'],
+                                              'tags': item['tags'] ?? <dynamic>[],
+                                              'downloads': item['downloads'] ?? 0,
+                                              'download_url': item['download_url'],
+                                              'preview_url': item['preview_url'],
+                                              'version': item['version'],
+                                              'size': item['size'],
+                                            };
+                                            final knowledge = Knowledge.fromJson(knowledgeMap);
+                                            final result = await Navigator.pushNamed(
+                                              context,
+                                              AppRouter.editKnowledge,
+                                              arguments: {
+                                                'knowledge': knowledge,
+                                              },
+                                            );
+                                            if (result == true) {
+                                              _refreshContent();
+                                            }
+                                          } else {
+                                            final personaMap = {
+                                              'id': item['id'] ?? '',
+                                              'name': item['name'] ?? '',
+                                              'description': item['description'] ?? '',
+                                              'uploader_id': item['uploader_id'] ?? item['uploader'] ?? '',
+                                              'star_count': item['star_count'] ?? 0,
+                                              'is_public': item['is_public'] ?? false,
+                                              'is_pending': item['is_pending'] ?? (item['status'] == 'pending'),
+                                              'created_at': item['created_at'] ?? item['createdAt'] ?? DateTime.now().toIso8601String(),
+                                              'updated_at': item['updated_at'] ?? item['updatedAt'],
+                                              'author': item['author'] ?? item['uploader_name'],
+                                              'author_id': item['author_id'] ?? item['uploader_id'],
+                                              'content': item['content'],
+                                              'tags': item['tags'] ?? <dynamic>[],
+                                              'downloads': item['downloads'] ?? 0,
+                                              'download_url': item['download_url'],
+                                              'preview_url': item['preview_url'],
+                                              'version': item['version'],
+                                              'size': item['size'],
+                                            };
+                                            final persona = Persona.fromJson(personaMap);
+                                            final result = await Navigator.pushNamed(
+                                              context,
+                                              AppRouter.editPersona,
+                                              arguments: {
+                                                'persona': persona,
+                                              },
+                                            );
+                                            if (result == true) {
+                                              _refreshContent();
+                                            }
+                                          }
+                                        },
+                                      ),
                                       if (canRevert)
                                         IconButton(
                                           icon: const Icon(Icons.undo),
@@ -506,6 +694,13 @@ class _ContentManagementTabContentState
     );
   }
 }
+
+
+
+
+
+
+
 
 
 

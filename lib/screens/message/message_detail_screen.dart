@@ -1,90 +1,96 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:provider/provider.dart';
-import '../../models/message.dart';
-import '../../providers/user_provider.dart';
-import '../../services/api_service.dart';
-import '../../utils/app_router.dart';
-import '../../utils/app_theme.dart';
-import '../../utils/app_colors.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
-class MessageDetailScreen extends StatefulWidget {
-  final String messageId;
+import '../../models/message.dart';
+import '../../utils/app_colors.dart';
+import '../../utils/app_theme.dart';
+import '../../viewmodels/message_detail_viewmodel.dart';
+import '../../widgets/async_state_view.dart';
 
+class MessageDetailScreen extends StatelessWidget {
   const MessageDetailScreen({super.key, required this.messageId});
 
+  final String messageId;
+
   @override
-  State<MessageDetailScreen> createState() => _MessageDetailScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) =>
+          MessageDetailViewModel(messageId: messageId)..load(),
+      child: const _MessageDetailView(),
+    );
+  }
 }
 
-class _MessageDetailScreenState extends State<MessageDetailScreen> {
-  Message? _message;
-  bool _isLoading = true;
-  String? _errorMessage;
+class _MessageDetailView extends StatelessWidget {
+  const _MessageDetailView();
 
   @override
-  void initState() {
-    super.initState();
-    _loadMessageDetail();
+  Widget build(BuildContext context) {
+    final viewModel = context.watch<MessageDetailViewModel>();
+    final message = viewModel.message;
+    final isLargeScreen = MediaQuery.of(context).size.width > 600;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('消息详情'),
+        backgroundColor: AppTheme.primaryOrange,
+        foregroundColor: Colors.white,
+        actions: [
+          if (message != null && !message.isRead)
+            IconButton(
+              icon: const Icon(Icons.mark_email_read, color: Colors.white),
+              onPressed: () => _markAsRead(context),
+              tooltip: '标记已读',
+            ),
+          if (message != null)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.white),
+              onPressed: () => _deleteMessage(context),
+              tooltip: '删除',
+            ),
+        ],
+      ),
+      body: AsyncStateView(
+        isLoading: viewModel.isLoading,
+        errorMessage: viewModel.errorMessage,
+        isEmpty: message == null,
+        emptyWidget: const Center(child: Text('消息不存在')),
+        onRetry: () => context.read<MessageDetailViewModel>().load(),
+        builder: (_) => _MessageDetailBody(
+          message: message!,
+          isLargeScreen: isLargeScreen,
+        ),
+      ),
+    );
   }
 
-  Future<void> _loadMessageDetail() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+  Future<void> _markAsRead(BuildContext context) async {
+    final viewModel = context.read<MessageDetailViewModel>();
     try {
-      final apiService = ApiService();
-      final messageData = await apiService.getMessageDetail(widget.messageId);
-      final message = Message.fromJson(messageData);
-
-      setState(() {
-        _message = message;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = '加载消息详情失败: $e';
-        _isLoading = false;
-      });
+      await viewModel.markAsRead();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('消息已标记为已读'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('标记已读失败: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
-  Future<void> _markAsRead() async {
-    if (_message == null || _message!.isRead) return;
-
-    try {
-      await ApiService().markMessageAsRead(_message!.id);
-      setState(() {
-        _message = _message!.copyWith(isRead: true);
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('消息已标记为已读'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('标记已读失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteMessage() async {
-    if (_message == null) return;
-
-    // 显示确认对话框
-    final confirmed = await showDialog<bool>(
+  Future<void> _deleteMessage(BuildContext context) async {
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
@@ -104,34 +110,212 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
         ],
       ),
     );
+    if (confirm != true) {
+      return;
+    }
 
-    if (confirmed != true) return;
-
+    final viewModel = context.read<MessageDetailViewModel>();
     try {
-      await ApiService().deleteMessage(_message!.id);
-      if (mounted) {
-        Navigator.of(context).pop(true); // 返回并传递删除成功标志
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('消息已删除'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('删除失败: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      await viewModel.deleteMessage();
+      if (!context.mounted) return;
+      Navigator.of(context).pop(true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('消息已删除'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('删除失败: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+}
 
-  String _formatDate(DateTime? date) {
-    if (date == null) return '';
+class _MessageDetailBody extends StatelessWidget {
+  const _MessageDetailBody({
+    required this.message,
+    required this.isLargeScreen,
+  });
+
+  final Message message;
+  final bool isLargeScreen;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isLargeScreen ? 24 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            message.title,
+            style: TextStyle(
+              fontSize: isLargeScreen ? 28 : 24,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: EdgeInsets.all(isLargeScreen ? 16 : 12),
+            decoration: BoxDecoration(
+              color: AppColors.onSurfaceWithOpacity01(context),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.email,
+                      size: isLargeScreen ? 20 : 18,
+                      color: AppColors.onSurfaceWithOpacity07(context),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '类型：${_getMessageTypeText(message.type)}',
+                      style: TextStyle(
+                        fontSize: isLargeScreen ? 14 : 12,
+                        color: AppColors.onSurfaceWithOpacity07(context),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: isLargeScreen ? 20 : 18,
+                      color: AppColors.onSurfaceWithOpacity07(context),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '发送时间：${_formatDate(message.createdAt)}',
+                      style: TextStyle(
+                        fontSize: isLargeScreen ? 14 : 12,
+                        color: AppColors.onSurfaceWithOpacity07(context),
+                      ),
+                    ),
+                  ],
+                ),
+                if (message.readAt != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.visibility,
+                        size: isLargeScreen ? 20 : 18,
+                        color: AppColors.onSurfaceWithOpacity07(context),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '阅读时间：${_formatDate(message.readAt!)}',
+                        style: TextStyle(
+                          fontSize: isLargeScreen ? 14 : 12,
+                          color: AppColors.onSurfaceWithOpacity07(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (message.summary != null && message.summary!.isNotEmpty) ...[
+            _SectionTitle(
+              title: '简介',
+              isLargeScreen: isLargeScreen,
+            ),
+            Container(
+              padding: EdgeInsets.all(isLargeScreen ? 16 : 12),
+              decoration: BoxDecoration(
+                color: AppColors.onSurfaceWithOpacity01(context),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                message.summary!,
+                style: TextStyle(
+                  fontSize: isLargeScreen ? 14 : 12,
+                  color: AppColors.onSurfaceWithOpacity07(context),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+          _SectionTitle(
+            title: '详细内容',
+            isLargeScreen: isLargeScreen,
+          ),
+          Container(
+            padding: EdgeInsets.all(isLargeScreen ? 16 : 12),
+            decoration: BoxDecoration(
+              color: AppColors.onSurfaceWithOpacity01(context),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: MarkdownBody(
+              data: message.content,
+              styleSheet: MarkdownStyleSheet(
+                h1: TextStyle(
+                  fontSize: isLargeScreen ? 24 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                h2: TextStyle(
+                  fontSize: isLargeScreen ? 20 : 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                h3: TextStyle(
+                  fontSize: isLargeScreen ? 18 : 16,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                p: TextStyle(
+                  fontSize: isLargeScreen ? 14 : 12,
+                  color: AppColors.onSurfaceWithOpacity07(context),
+                  height: 1.6,
+                ),
+                codeblockDecoration: BoxDecoration(
+                  color: AppColors.onSurfaceWithOpacity01(context),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                code: TextStyle(
+                  fontSize: isLargeScreen ? 13 : 11,
+                  fontFamily: 'monospace',
+                  backgroundColor: AppColors.onSurfaceWithOpacity01(context),
+                ),
+                a: TextStyle(
+                  color: AppTheme.primaryOrange,
+                  decoration: TextDecoration.underline,
+                ),
+                listBullet: TextStyle(
+                  color: AppTheme.primaryOrange,
+                ),
+              ),
+              onTapLink: (text, href, title) {
+                if (href != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('链接: $href')),
+                  );
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
 
@@ -152,7 +336,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
     }
   }
 
-  String _getMessageTypeText(String type) {
+  static String _getMessageTypeText(String type) {
     switch (type) {
       case 'announcement':
         return '公告';
@@ -168,274 +352,30 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
         return type;
     }
   }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({
+    required this.title,
+    required this.isLargeScreen,
+  });
+
+  final String title;
+  final bool isLargeScreen;
 
   @override
   Widget build(BuildContext context) {
-    final isLargeScreen = MediaQuery.of(context).size.width > 600;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('消息详情'),
-        backgroundColor: AppTheme.primaryOrange,
-        foregroundColor: Colors.white,
-        actions: [
-          if (_message != null && !_message!.isRead)
-            IconButton(
-              icon: const Icon(Icons.mark_email_read, color: Colors.white),
-              onPressed: _markAsRead,
-              tooltip: '标记已读',
-            ),
-          if (_message != null)
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.white),
-              onPressed: _deleteMessage,
-              tooltip: '删除',
-            ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: isLargeScreen ? 18 : 16,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadMessageDetail,
-                        child: const Text('重试'),
-                      ),
-                    ],
-                  ),
-                )
-              : _message == null
-                  ? const Center(child: Text('消息不存在'))
-                  : SingleChildScrollView(
-                      padding: EdgeInsets.all(isLargeScreen ? 24 : 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 标题
-                          Text(
-                            _message!.title,
-                            style: TextStyle(
-                              fontSize: isLargeScreen ? 28 : 24,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // 消息信息
-                          Container(
-                            padding: EdgeInsets.all(isLargeScreen ? 16 : 12),
-                            decoration: BoxDecoration(
-                              color: AppColors.onSurfaceWithOpacity01(context),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.email,
-                                      size: isLargeScreen ? 20 : 18,
-                                      color: AppColors.onSurfaceWithOpacity07(context),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '类型：${_getMessageTypeText(_message!.type)}',
-                                      style: TextStyle(
-                                        fontSize: isLargeScreen ? 14 : 12,
-                                        color: AppColors.onSurfaceWithOpacity07(context),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.access_time,
-                                      size: isLargeScreen ? 20 : 18,
-                                      color: AppColors.onSurfaceWithOpacity07(context),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '发送时间：${_formatDate(_message!.createdAt)}',
-                                      style: TextStyle(
-                                        fontSize: isLargeScreen ? 14 : 12,
-                                        color: AppColors.onSurfaceWithOpacity07(context),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (_message!.readAt != null) ...[
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.visibility,
-                                        size: isLargeScreen ? 20 : 18,
-                                        color: AppColors.onSurfaceWithOpacity07(context),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '阅读时间：${_formatDate(_message!.readAt)}',
-                                        style: TextStyle(
-                                          fontSize: isLargeScreen ? 14 : 12,
-                                          color: AppColors.onSurfaceWithOpacity07(context),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // 简介（如果有）
-                          if (_message!.summary != null && _message!.summary!.isNotEmpty) ...[
-                            Text(
-                              '简介',
-                              style: TextStyle(
-                                fontSize: isLargeScreen ? 18 : 16,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: EdgeInsets.all(isLargeScreen ? 16 : 12),
-                              decoration: BoxDecoration(
-                                color: AppColors.onSurfaceWithOpacity01(context),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                _message!.summary!,
-                                style: TextStyle(
-                                  fontSize: isLargeScreen ? 14 : 12,
-                                  color: AppColors.onSurfaceWithOpacity07(context),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                          ],
-
-                          // 详细内容
-                          Text(
-                            '详细内容',
-                            style: TextStyle(
-                              fontSize: isLargeScreen ? 18 : 16,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: EdgeInsets.all(isLargeScreen ? 16 : 12),
-                            decoration: BoxDecoration(
-                              color: AppColors.onSurfaceWithOpacity01(context),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: MarkdownBody(
-                              data: _message!.content,
-                              styleSheet: MarkdownStyleSheet(
-                                // 标题样式
-                                h1: TextStyle(
-                                  fontSize: isLargeScreen ? 24 : 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
-                                h2: TextStyle(
-                                  fontSize: isLargeScreen ? 20 : 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
-                                h3: TextStyle(
-                                  fontSize: isLargeScreen ? 18 : 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
-                                // 段落样式
-                                p: TextStyle(
-                                  fontSize: isLargeScreen ? 14 : 12,
-                                  color: AppColors.onSurfaceWithOpacity07(context),
-                                  height: 1.6,
-                                ),
-                                // 代码块样式
-                                codeblockDecoration: BoxDecoration(
-                                  color: AppColors.onSurfaceWithOpacity01(context),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                code: TextStyle(
-                                  fontSize: isLargeScreen ? 13 : 11,
-                                  fontFamily: 'monospace',
-                                  backgroundColor: AppColors.onSurfaceWithOpacity01(context),
-                                ),
-                                // 链接样式
-                                a: TextStyle(
-                                  color: AppTheme.primaryOrange,
-                                  decoration: TextDecoration.underline,
-                                ),
-                                // 列表样式
-                                listBullet: TextStyle(
-                                  color: AppTheme.primaryOrange,
-                                ),
-                              ),
-                              onTapLink: (text, href, title) {
-                                // 处理链接点击
-                                if (href != null) {
-                                  // 可以使用url_launcher打开链接
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('链接: $href'),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // 操作按钮
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              if (!_message!.isRead)
-                                ElevatedButton.icon(
-                                  onPressed: _markAsRead,
-                                  icon: const Icon(Icons.mark_email_read),
-                                  label: const Text('标记已读'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.primaryOrange,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ElevatedButton.icon(
-                                onPressed: _deleteMessage,
-                                icon: const Icon(Icons.delete),
-                                label: const Text('删除'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(context).colorScheme.error,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
     );
   }
 }
-
-
 

@@ -86,6 +86,14 @@ class _ReviewTabContentState extends State<ReviewTabContent>
           _error = e.toString();
           _isLoading = false;
         });
+        // 显示错误提示
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载待审核内容失败: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     }
   }
@@ -106,6 +114,7 @@ class _ReviewTabContentState extends State<ReviewTabContent>
       setState(() {
         _pendingKnowledge.removeWhere((item) => item.id == knowledgeId);
       });
+      _loadPendingItems();
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -129,6 +138,7 @@ class _ReviewTabContentState extends State<ReviewTabContent>
       setState(() {
         _pendingKnowledge.removeWhere((item) => item.id == knowledgeId);
       });
+      _loadPendingItems();
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -152,6 +162,7 @@ class _ReviewTabContentState extends State<ReviewTabContent>
       setState(() {
         _pendingPersonas.removeWhere((item) => item.id == personaId);
       });
+      _loadPendingItems();
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -175,6 +186,7 @@ class _ReviewTabContentState extends State<ReviewTabContent>
       setState(() {
         _pendingPersonas.removeWhere((item) => item.id == personaId);
       });
+      _loadPendingItems();
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -239,7 +251,16 @@ class _ReviewTabContentState extends State<ReviewTabContent>
     }
 
     if (_pendingKnowledge.isEmpty) {
-      return const Center(child: Text('暂无待审核的知识库'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('暂无待审核的知识库'),
+            if (_knowledgeTotal > 0)
+              Text('总数: $_knowledgeTotal', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+      );
     }
 
     return RefreshIndicator(
@@ -318,7 +339,16 @@ class _ReviewTabContentState extends State<ReviewTabContent>
     }
 
     if (_pendingPersonas.isEmpty) {
-      return const Center(child: Text('暂无待审核的人设卡'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('暂无待审核的人设卡'),
+            if (_personaTotal > 0)
+              Text('总数: $_personaTotal', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+      );
     }
 
     return RefreshIndicator(
@@ -375,3 +405,4 @@ class _ReviewTabContentState extends State<ReviewTabContent>
     );
   }
 }
+

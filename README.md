@@ -17,6 +17,7 @@
 - ✅ 个人资料管理
 - ✅ 主题切换（亮色/暗色模式）
 - ✅ 响应式布局适配
+- ✅ “我的内容”管理入口（知识库/人设卡分页筛选、删除）
 
 ### 内容管理
 - ✅ 知识库上传和管理
@@ -24,6 +25,7 @@
 - ✅ 文件选择和批量上传
 - ✅ 内容详情查看
 - ✅ Star/取消Star功能
+- ✅ 文件级下载/删除（管理员/上传者）
 
 ### 审核系统
 - ✅ 待审核内容列表
@@ -107,6 +109,50 @@ flutter build ios --release
 flutter build web --release
 ```
 
+### 启动构建好的Web项目
+
+构建完成后，静态文件会生成在 `build/web/` 目录下。可以通过以下方式启动：
+
+**方法1：使用启动脚本（推荐）**
+```bash
+# Windows
+scripts\serve.bat
+
+# Linux/Mac
+chmod +x scripts/serve.sh
+./scripts/serve.sh
+```
+
+**方法2：使用Python HTTP服务器**
+```bash
+# 进入构建目录
+cd build/web
+
+# Python 3
+python3 -m http.server 8000
+
+# Python 2 (如果只有Python 2)
+python -m SimpleHTTPServer 8000
+```
+
+**方法3：使用Node.js http-server**
+```bash
+# 需要先安装: npm install -g http-server
+npx http-server build/web -p 8000
+```
+
+**方法4：使用Flutter serve（会重新构建）**
+```bash
+flutter run -d chrome --release
+```
+
+启动后，在浏览器中访问 `http://localhost:8000` 即可查看应用。
+
+**注意**：
+- 确保后端服务器已启动并可访问
+- 如果构建时指定了API地址，确保该地址可访问
+- 生产环境部署时，建议使用专业的Web服务器（如Nginx、Apache等）
+
 ## 📋 API文档
 
 项目使用RESTful API与后端通信，完整的API文档请参考后端项目的 [API.md](../MaiMaiNotePad-BackEnd/docs/API.md)。
@@ -116,18 +162,26 @@ flutter build web --release
 - **认证方式**: Bearer Token (JWT)
 - **支持格式**: JSON 和表单数据
 
-### 最新更新（2025-11-23）
+### 最新更新（2025-11-25）
 
-**新增接口支持**：
+**新增/更新接口支持**：
 - `GET /api/knowledge/{kb_id}/starred` - 检查知识库Star状态
 - `GET /api/persona/{pc_id}/starred` - 检查人设卡Star状态
-- `GET /api/user/stars?include_details={bool}` - 获取用户Star记录（支持包含详情）
-- `GET /api/knowledge/public` - 支持分页、搜索、筛选、排序
-- `GET /api/persona/public` - 支持分页、搜索、筛选、排序
+- `GET /api/user/stars?include_details={bool}&type={all|knowledge|persona}&sort_by&sort_order&page&page_size` - 获取用户Star记录，支持分页、排序、返回详情
+- `GET /api/knowledge/public` / `GET /api/persona/public` - 支持分页、名称/标签/上传者筛选、排序
+- `GET /api/knowledge/user/{id}` / `GET /api/persona/user/{id}` - 用户内容分页、筛选、排序
+- `DELETE /api/knowledge/{knowledgeId}/{fileId}` - 删除单个知识库文件
+- `PUT /api/persona/{id}` - 更新人设卡名称/描述/版权方
+
+**体验与安全**：
+- 新增 SessionStore 全局 401 回调，自动跳转登录并清理本地 Session
+- 登录页错误信息解析优化，展示 requestId/详情以便排障
+- 详情页支持文件级下载/删除、收藏计数实时更新
+- 收藏页支持分页、排序、就地取消收藏
 
 **性能优化**：
 - Star状态检查：从获取所有Star记录 → 单次API调用
-- "我的收藏"页面：从 1+N 次请求 → 1 次请求（使用 `includeDetails=true`）
+- "我的收藏"页面：从 1+N 次请求 → 1 次请求（使用 `includeDetails=true` + 分页）
 - 公开列表：支持分页加载，减少初始加载时间
 
 详细更新内容请参考 [CHANGELOG.md](docs/CHANGELOG.md)。
@@ -275,3 +329,4 @@ A: 使用构建脚本或编译参数：
 ---
 
 ⭐ 如果这个项目对你有帮助，请给个Star支持一下！
+

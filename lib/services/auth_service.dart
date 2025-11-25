@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../constants/app_constants.dart';
 import 'api_service.dart';
+import 'core/api_error.dart';
 
 class AuthService {
   final ApiService _apiService = ApiService();
@@ -328,7 +330,10 @@ class AuthService {
         return {'success': false, 'message': '登录失败：状态码 ${response.statusCode}'};
       }
     } catch (e) {
-      return {'success': false, 'message': '登录异常：${e.toString()}'};
+      final readableMessage = e is ApiServiceError
+          ? e.toDisplayString(includeDetails: false)
+          : e.toString();
+      return {'success': false, 'message': readableMessage};
     }
   }
 

@@ -11,6 +11,14 @@
 - **认证方式**: Bearer Token (JWT)
 - **Content-Type**: 支持 `application/json` 和 `application/x-www-form-urlencoded`
 
+## 前端适配新增接口（2025-11-25）
+
+- `GET /api/knowledge/{id}/starred` / `GET /api/persona/{id}/starred` - Star 状态检查
+- `GET /api/user/stars?include_details={bool}&type&sort_by&sort_order&page&page_size` - 收藏分页/排序，支持返回详情
+- `GET /api/knowledge/public` / `GET /api/persona/public` - 公开列表分页，支持名称/标签/上传者筛选与排序
+- `GET /api/knowledge/user/{user_id}` / `GET /api/persona/user/{user_id}` - 用户内容分页、筛选、排序
+- `DELETE /api/knowledge/{knowledgeId}/{fileId}` - 删除单个知识库文件（返回是否删除整条知识库）
+- `PUT /api/persona/{id}` - 更新人设卡名称/描述/版权方
 ## 认证相关接口
 
 ### 用户登录

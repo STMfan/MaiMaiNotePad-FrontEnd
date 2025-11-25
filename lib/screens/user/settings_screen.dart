@@ -94,13 +94,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _pickAvatarImage() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
+        type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
       );
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
         
+        // 验证文件扩展名
+        final extension = file.extension?.toLowerCase();
+        final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        if (extension == null || !allowedExtensions.contains(extension)) {
+          _showError('不支持的文件格式，仅支持 JPG、PNG、GIF、WebP');
+          return;
+        }
+        
+        // 验证文件大小
         if (file.size > 2 * 1024 * 1024) {
           _showError('文件大小不能超过2MB');
           return;

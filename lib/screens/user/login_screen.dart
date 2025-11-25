@@ -11,6 +11,71 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
+class _ParsedErrorMessage {
+  final String title;
+  final String description;
+  final String? requestId;
+  final String? details;
+  final String raw;
+
+  const _ParsedErrorMessage({
+    required this.title,
+    required this.description,
+    required this.requestId,
+    required this.details,
+    required this.raw,
+  });
+
+  bool get hasExtraInfo =>
+      (requestId != null && requestId!.isNotEmpty) ||
+      (details != null && details!.isNotEmpty) ||
+      raw.split('\n').length > 1;
+
+  factory _ParsedErrorMessage.from(String rawMessage) {
+    final normalizedLines = rawMessage
+        .replaceAll('\r\n', '\n')
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+
+    String title =
+        normalizedLines.isNotEmpty ? normalizedLines.first : '登录失败';
+    String description = '';
+    String? requestId;
+    String? details;
+
+    for (final line in normalizedLines.skip(1)) {
+      if (line.startsWith('请求ID')) {
+        requestId = line.split(':').skip(1).join(':').trim();
+      } else if (line.startsWith('详情')) {
+        final detailText = line.split(':').skip(1).join(':').trim();
+        details = (details == null || details!.isEmpty)
+            ? detailText
+            : '${details!}\n$detailText';
+      } else if (description.isEmpty) {
+        description = line;
+      } else {
+        details = (details == null || details!.isEmpty)
+            ? line
+            : '${details!}\n$line';
+      }
+    }
+
+    if (description.isEmpty && title.contains(' - ')) {
+      description = title.split(' - ').skip(1).join(' - ').trim();
+    }
+
+    return _ParsedErrorMessage(
+      title: title,
+      description: description,
+      requestId: requestId,
+      details: details,
+      raw: rawMessage,
+    );
+  }
+}
+
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
@@ -37,221 +102,226 @@ class _LoginScreenState extends State<LoginScreen> {
         // 登录成功，导航到主页
         Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
       } else if (!success && mounted) {
-        // 获取详细的错误信息
         final errorMessage = userProvider.errorMessage ?? '登录失败';
+        final parsedError = _ParsedErrorMessage.from(errorMessage);
 
-        // 提取错误码用于显示
-        String displayError = errorMessage;
-        if (errorMessage.contains('错误码:')) {
-          final parts = errorMessage.split(' - ');
-          if (parts.isNotEmpty) {
-            displayError = parts[0]; // 只显示错误码部分
-          }
-        }
-
-        // 显示详细的错误提示
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(top: 16, left: 16, right: 16),
+            dismissDirection: DismissDirection.up,
+            showCloseIcon: true,
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '登录失败',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                Text(
+                  parsedError.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 4),
-                Text(displayError),
+                if (parsedError.description.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(parsedError.description),
+                ],
+                if (parsedError.requestId != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '请求ID: ${parsedError.requestId}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+                if (parsedError.details != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    parsedError.details!,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
               ],
             ),
             backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: '详情',
-              textColor: Colors.white,
-              onPressed: () {
-                // 检查widget是否仍然mounted
-                if (!mounted) return;
-                // 显示完整的错误信息对话框
-                showDialog(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: const Text('登录错误详情'),
-                      content: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 解析错误码和错误信息
-                            Builder(
-                              builder: (context) {
-                                final errorText = errorMessage;
-                                String errorCode = '';
-                                String errorDesc = errorText;
-                                String errorType = '系统错误';
-
-                                // 提取错误码 (格式: "错误码: XXX - 描述")
-                                if (errorText.contains('错误码:')) {
-                                  final parts = errorText.split('错误码: ');
-                                  if (parts.length > 1) {
-                                    final codeAndDesc = parts[1].split(' - ');
-                                    if (codeAndDesc.isNotEmpty) {
-                                      errorCode = codeAndDesc[0];
-                                      if (codeAndDesc.length > 1) {
-                                        errorDesc = codeAndDesc[1];
-                                      }
-                                    }
-                                  }
-                                }
-
-                                // 识别特殊错误类型
-                                if (errorText.contains('NoSuchMethodError')) {
-                                  errorType = '数据格式错误';
-                                  errorDesc = '服务器返回的数据格式不正确，请联系管理员';
-                                } else if (errorText.contains(
-                                  'Dynamic call failed',
-                                )) {
-                                  errorType = 'API响应错误';
-                                  errorDesc = '服务器API响应异常，可能是用户数据不完整';
-                                } else if (errorText.contains('null')) {
-                                  errorType = '空值错误';
-                                  errorDesc = '服务器返回了空值数据，请检查用户状态';
-                                } else if (errorText.contains('401')) {
-                                  errorType = '认证失败';
-                                  errorDesc = '用户名或密码错误';
-                                } else if (errorText.contains('403')) {
-                                  errorType = '权限错误';
-                                  errorDesc = '您没有访问权限';
-                                } else if (errorText.contains('500')) {
-                                  errorType = '服务器错误';
-                                  errorDesc = '服务器内部错误，请稍后再试';
-                                } else if (errorText.contains('网络')) {
-                                  errorType = '网络错误';
-                                }
-
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    SelectableText(
-                                      '错误类型: $errorType',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: Colors.orange,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    if (errorCode.isNotEmpty) ...[
-                                      SelectableText(
-                                        '错误码: $errorCode',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                    ],
-                                    SelectableText('错误描述: $errorDesc'),
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                            SelectableText(
-                              '用户名: ${_usernameController.text.trim()}',
-                            ),
-                            const SizedBox(height: 8),
-                            SelectableText('时间: ${DateTime.now().toString()}'),
-                            const SizedBox(height: 8),
-                            Builder(
-                              builder: (context) {
-                                // 根据错误类型提供具体的解决方案
-                                List<String> solutions = ['• 检查用户名和密码是否正确'];
-
-                                if (errorMessage.contains(
-                                      'NoSuchMethodError',
-                                    ) ||
-                                    errorMessage.contains(
-                                      'Dynamic call failed',
-                                    )) {
-                                  solutions = [
-                                    '• 联系管理员检查服务器API响应格式',
-                                    '• 确认用户数据完整性',
-                                    '• 检查数据库连接状态',
-                                    '• 等待服务器修复后重试',
-                                  ];
-                                } else if (errorMessage.contains('401')) {
-                                  solutions = [
-                                    '• 确认用户名和密码是否正确',
-                                    '• 检查是否区分大小写',
-                                    '• 确认账户是否已激活',
-                                    '• 尝试重置密码',
-                                  ];
-                                } else if (errorMessage.contains('403')) {
-                                  solutions = [
-                                    '• 确认账户权限状态',
-                                    '• 联系管理员获取访问权限',
-                                    '• 检查账户是否被禁用',
-                                  ];
-                                } else if (errorMessage.contains('500')) {
-                                  solutions = [
-                                    '• 等待几分钟后重试',
-                                    '• 检查服务器状态页面',
-                                    '• 联系管理员报告此问题',
-                                  ];
-                                } else if (errorMessage.contains('网络')) {
-                                  solutions = [
-                                    '• 检查网络连接状态',
-                                    '• 尝试切换网络环境',
-                                    '• 确认服务器地址是否正确',
-                                    '• 检查防火墙设置',
-                                  ];
-                                } else {
-                                  solutions.addAll([
-                                    '• 检查网络连接',
-                                    '• 确认服务器是否正常运行',
-                                    '• 联系管理员获取帮助',
-                                  ]);
-                                }
-
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const SelectableText(
-                                      '可能的解决方案:',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    ...solutions.map(
-                                      (solution) => SelectableText(solution),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text('关闭'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
+            duration: const Duration(seconds: 6),
+            action: parsedError.hasExtraInfo
+                ? SnackBarAction(
+                    label: '详情',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      if (!mounted) return;
+                      _showLoginErrorDetails(errorMessage);
+                    },
+                  )
+                : null,
           ),
         );
       }
     }
+  }
+
+  void _showLoginErrorDetails(String errorMessage) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('登录错误详情'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Builder(
+                  builder: (context) {
+                    String errorCode = '';
+                    String errorDesc = errorMessage;
+                    String errorType = '系统错误';
+
+                    if (errorMessage.contains('错误码:')) {
+                      final parts = errorMessage.split('错误码: ');
+                      if (parts.length > 1) {
+                        final codeAndDesc = parts[1].split(' - ');
+                        if (codeAndDesc.isNotEmpty) {
+                          errorCode = codeAndDesc[0];
+                          if (codeAndDesc.length > 1) {
+                            errorDesc = codeAndDesc[1];
+                          }
+                        }
+                      }
+                    }
+
+                    if (errorMessage.contains('NoSuchMethodError')) {
+                      errorType = '数据格式错误';
+                      errorDesc = '服务器返回的数据格式不正确，请联系管理员';
+                    } else if (errorMessage.contains('Dynamic call failed')) {
+                      errorType = 'API响应错误';
+                      errorDesc = '服务器API响应异常，可能是用户数据不完整';
+                    } else if (errorMessage.contains('null')) {
+                      errorType = '空值错误';
+                      errorDesc = '服务器返回了空值数据，请检查用户状态';
+                    } else if (errorMessage.contains('401')) {
+                      errorType = '认证失败';
+                      errorDesc = '用户名或密码错误';
+                    } else if (errorMessage.contains('403')) {
+                      errorType = '权限错误';
+                      errorDesc = '您没有访问权限';
+                    } else if (errorMessage.contains('500')) {
+                      errorType = '服务器错误';
+                      errorDesc = '服务器内部错误，请稍后再试';
+                    } else if (errorMessage.contains('网络')) {
+                      errorType = '网络错误';
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SelectableText(
+                          '错误类型: $errorType',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.orange,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (errorCode.isNotEmpty) ...[
+                          SelectableText(
+                            '错误码: $errorCode',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                        SelectableText('错误描述: $errorDesc'),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  '用户名: ${_usernameController.text.trim()}',
+                ),
+                const SizedBox(height: 8),
+                SelectableText('时间: ${DateTime.now().toString()}'),
+                const SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    List<String> solutions = ['• 检查用户名和密码是否正确'];
+
+                    if (errorMessage.contains('NoSuchMethodError') ||
+                        errorMessage.contains('Dynamic call failed')) {
+                      solutions = [
+                        '• 联系管理员检查服务器API响应格式',
+                        '• 确认用户数据完整性',
+                        '• 检查数据库连接状态',
+                        '• 等待服务器修复后重试',
+                      ];
+                    } else if (errorMessage.contains('401')) {
+                      solutions = [
+                        '• 确认用户名和密码是否正确',
+                        '• 检查是否区分大小写',
+                        '• 确认账户是否已激活',
+                        '• 尝试重置密码',
+                      ];
+                    } else if (errorMessage.contains('403')) {
+                      solutions = [
+                        '• 确认账户权限状态',
+                        '• 联系管理员获取访问权限',
+                        '• 检查账户是否被禁用',
+                      ];
+                    } else if (errorMessage.contains('500')) {
+                      solutions = [
+                        '• 等待几分钟后重试',
+                        '• 检查服务器状态页面',
+                        '• 联系管理员报告此问题',
+                      ];
+                    } else if (errorMessage.contains('网络')) {
+                      solutions = [
+                        '• 检查网络连接状态',
+                        '• 尝试切换网络环境',
+                        '• 确认服务器地址是否正确',
+                        '• 检查防火墙设置',
+                      ];
+                    } else {
+                      solutions.addAll([
+                        '• 检查网络连接',
+                        '• 确认服务器是否正常运行',
+                        '• 联系管理员获取帮助',
+                      ]);
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SelectableText(
+                          '可能的解决方案:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        ...solutions.map(
+                          (solution) => SelectableText(solution),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

@@ -107,6 +107,7 @@ class _EditKnowledgeScreenState extends State<EditKnowledgeScreen> {
         copyrightOwner: _copyrightController.text.trim().isNotEmpty
             ? _copyrightController.text.trim()
             : null,
+        isPublic: _isPublic,
       );
 
       _showSuccess('知识库更新成功');
@@ -243,7 +244,19 @@ class _EditKnowledgeScreenState extends State<EditKnowledgeScreen> {
                         },
                         activeColor: AppTheme.primaryOrange,
                       ),
-                      const Text('公开知识库'),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text('公开知识库'),
+                            SizedBox(height: 2),
+                            Text(
+                              '开启后，审核通过的内容将对所有用户可见；关闭则仅自用或待审核/退回。',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
