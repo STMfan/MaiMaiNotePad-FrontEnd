@@ -282,7 +282,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // 应用副标题
                   Text(
-                    'MaiBot非官方内容分享站',
+                    '让每个人的麦麦都变得好聪明好聪明！o(*￣▽￣*)ブ',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(
                         context,

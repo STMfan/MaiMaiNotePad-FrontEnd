@@ -12,7 +12,12 @@ class HomePageContent extends StatelessWidget {
   final VoidCallback? onProfilePressed;
   final VoidCallback? onAdminPressed;
 
-  const HomePageContent({super.key, this.onUploadPressed, this.onProfilePressed, this.onAdminPressed});
+  const HomePageContent({
+    super.key,
+    this.onUploadPressed,
+    this.onProfilePressed,
+    this.onAdminPressed,
+  });
 
   // 构建欢迎内容 - 响应式设计
   List<Widget> _buildWelcomeContent(
@@ -49,7 +54,10 @@ class HomePageContent extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('欢迎使用 ${AppConstants.appName}', style: titleStyle),
+            Text(
+              '${AppConstants.appName},让每个人的麦麦都变得好聪明好聪明！o(*￣▽￣*)ブ',
+              style: titleStyle,
+            ),
             SizedBox(height: isLargeScreen ? 12 : 8),
             if (userProvider.isLoggedIn) ...[
               Text(

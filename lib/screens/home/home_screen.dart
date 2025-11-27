@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   String _knowledgeSearchQuery = '';
   String _personaSearchQuery = '';
-  
+
   // 未读消息数量
   int _unreadMessageCount = 0;
 
@@ -83,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       final apiService = ApiService();
       final response = await apiService.getPublicKnowledge();
-      
+
       setState(() {
         _knowledgeList.clear();
         _knowledgeList.addAll(response.items);
@@ -106,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       final apiService = ApiService();
       final response = await apiService.getPublicPersonas();
-      
+
       setState(() {
         _personaList.clear();
         _personaList.addAll(response.items);
@@ -137,8 +137,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       final apiService = ApiService();
       final messages = await apiService.getUserMessages(page: 1, limit: 100);
-      final unreadCount = messages.where((msg) => msg['is_read'] == false).length;
-      
+      final unreadCount = messages
+          .where((msg) => msg['is_read'] == false)
+          .length;
+
       if (mounted) {
         setState(() {
           _unreadMessageCount = unreadCount;
@@ -206,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // 计算上传管理tab的索引
     // basePages: 知识库(0) + 人设卡(1) + 消息(2) + 个人资料(3) = 4
     int uploadManagementIndex = 4; // 从basePages之后开始
-    
+
     // 审核员和管理员都有审核管理页面
     if (userProvider.currentUser?.isAdminOrModerator == true) {
       uploadManagementIndex += 1; // 审核管理
@@ -215,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (userProvider.currentUser?.role == 'admin') {
       uploadManagementIndex += 1; // 管理员概览
     }
-    // 现在的uploadManagementIndex就是上传管理的索引（上传管理在最后）
+    // 上传管理现在对所有用户可见，总是放在最后
 
     setState(() {
       _currentIndex = uploadManagementIndex;
@@ -271,10 +273,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       adminPages.add(AdminOverviewTabContent());
     }
 
-    // 添加上传管理标签页（管理员和审核员可见）
-    if (userProvider.currentUser?.isAdminOrModerator == true) {
-      adminPages.add(UploadManagementTabContent());
-    }
+    // 添加上传管理标签页（所有登录用户可见）
+    adminPages.add(UploadManagementTabContent());
 
     return [...basePages, ...adminPages];
   }
@@ -282,8 +282,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildMainContent(UserProvider userProvider) {
     final pages = _buildPages(userProvider);
     // 确保索引在有效范围内，防止越界错误
-    final safeIndex = _currentIndex >= 0 && _currentIndex < pages.length 
-        ? _currentIndex 
+    final safeIndex = _currentIndex >= 0 && _currentIndex < pages.length
+        ? _currentIndex
         : 0;
     // 如果索引无效，重置为0
     if (safeIndex != _currentIndex) {
@@ -406,10 +406,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               3,
                             ),
                           ],
-                          if (userProvider.currentUser?.isAdminOrModerator ==
-                              true) ...[
-                            _buildNavItem(Icons.cloud_upload, '上传管理', 4),
-                          ],
+                          _buildNavItem(Icons.cloud_upload, '上传管理', 4),
                         ],
                       ),
                     ),
@@ -494,7 +491,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                           minHeight: 16,
                                         ),
                                         child: Text(
-                                          _unreadMessageCount > 99 ? '99+' : '$_unreadMessageCount',
+                                          _unreadMessageCount > 99
+                                              ? '99+'
+                                              : '$_unreadMessageCount',
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 10,
@@ -519,10 +518,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                           context,
                                         ).colorScheme.primary,
                                         child: Text(
-                                          userProvider.currentUser?.name.substring(
-                                                0,
-                                                1,
-                                              ) ??
+                                          userProvider.currentUser?.name
+                                                  .substring(0, 1) ??
                                               'U',
                                           style: TextStyle(
                                             color: Colors.white,
@@ -535,7 +532,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       // 用户名（仅在大屏幕显示）
                                       if (isLargeScreen)
                                         Text(
-                                          userProvider.currentUser?.name ?? '用户',
+                                          userProvider.currentUser?.name ??
+                                              '用户',
                                           style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w500,
@@ -582,9 +580,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     value: 'logout',
                                     child: Row(
                                       children: [
-                                        Icon(Icons.logout, size: 20, color: Colors.red),
+                                        Icon(
+                                          Icons.logout,
+                                          size: 20,
+                                          color: Colors.red,
+                                        ),
                                         SizedBox(width: 8),
-                                        Text('登出', style: TextStyle(color: Colors.red)),
+                                        Text(
+                                          '登出',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -639,17 +644,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (pageIndex <= 1) {
       return pageIndex;
     }
-    
+
     // 消息(2)和个人资料(3)不在侧边栏显示
     if (pageIndex == 2 || pageIndex == 3) {
       return -1;
     }
-    
+
     // 从索引4开始是管理页面，需要根据用户权限和页面顺序来确定导航索引
     // 页面顺序（动态）：审核管理(4) -> 管理员概览(5) -> 上传管理(6)
     // 导航索引（固定）：审核管理(2), 管理员概览(3), 上传管理(4)
     int currentPageIndex = 4;
-    
+
     // 审核管理（管理员和审核员可见，页面索引4，导航索引2）
     if (userProvider.currentUser?.isAdminOrModerator == true) {
       if (pageIndex == currentPageIndex) {
@@ -657,7 +662,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
       currentPageIndex++;
     }
-    
+
     // 管理员概览（仅管理员可见，页面索引5，导航索引3）
     if (userProvider.currentUser?.role == 'admin') {
       if (pageIndex == currentPageIndex) {
@@ -665,14 +670,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
       currentPageIndex++;
     }
-    
+
     // 上传管理（管理员和审核员可见，页面索引6，导航索引4）
     if (userProvider.currentUser?.isAdminOrModerator == true) {
       if (pageIndex == currentPageIndex) {
         return 4; // 导航索引固定为4
       }
     }
-    
+
     return -1; // 未找到匹配的导航索引
   }
 
@@ -730,14 +735,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               // 导航索引（侧边栏）：知识库(0), 人设卡(1), 审核管理(2), 管理员概览(3), 上传管理(4)
               // 实际页面索引：知识库(0), 人设卡(1), 消息(2), 个人资料(3), 审核管理(4), 管理员概览(5), 上传管理(6)
               int actualIndex = index;
-              
+
               // 基础页面（0-1）直接对应
               if (index <= 1) {
                 actualIndex = index;
               } else {
                 // 管理页面从索引4开始（basePages有4个：知识库、人设卡、消息、个人资料）
                 actualIndex = 4; // basePages之后开始
-                
+
                 // 审核管理（导航索引2，实际页面索引4）
                 if (index == 2) {
                   actualIndex = 4;
@@ -764,7 +769,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   // 现在actualIndex就是上传管理的索引
                 }
               }
-              
+
               // 审核管理权限检查（导航索引2，实际页面索引4）
               if (index == 2 &&
                   userProvider.currentUser?.isAdminOrModerator != true) {
@@ -782,19 +787,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 return;
               }
 
-              // 上传管理权限检查（导航索引4，实际页面索引6）
-              if (index == 4 &&
-                  userProvider.currentUser?.isAdminOrModerator != true) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('需要管理员或审核员权限')));
-                return;
-              }
+              // 上传管理现在对所有用户可见，不再需要权限检查
 
               setState(() {
                 _currentIndex = actualIndex;
               });
-              
+
               // 如果切换到消息页面，刷新未读消息数量
               if (actualIndex == 2) {
                 _loadUnreadMessageCount();
@@ -823,9 +821,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           return '首页';
       }
     }
-    
+
     int currentIndex = 4;
-    
+
     // 审核管理（管理员和审核员可见）
     if (userProvider.currentUser?.isAdminOrModerator == true) {
       if (index == currentIndex) {
@@ -833,7 +831,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
       currentIndex++;
     }
-    
+
     // 管理员概览（仅管理员可见）
     if (userProvider.currentUser?.role == 'admin') {
       if (index == currentIndex) {
@@ -841,14 +839,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
       currentIndex++;
     }
-    
+
     // 上传管理（管理员和审核员可见）
     if (userProvider.currentUser?.isAdminOrModerator == true) {
       if (index == currentIndex) {
         return '上传管理';
       }
     }
-    
+
     return '首页';
   }
 }

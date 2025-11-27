@@ -118,85 +118,93 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
   Future<void> _loadUploadHistory() async {
     try {
       final apiService = ApiService();
-      final response = await apiService.get('/api/admin/upload-history?page=1&limit=20');
+      final response = await apiService.get(
+        '/api/admin/upload-history?page=1&limit=20',
+      );
       final data = response.data;
-      
+
       // 添加调试日志
       debugPrint('Upload history API response: $data');
-      
+
       if (data['success'] == true) {
         final responseData = data['data'];
-        
-        // 检查是否包含错误信息（权限错误等）
-        if (responseData is Map && responseData.containsKey('detail')) {
-          // 这是错误信息，不是数据
-          debugPrint('API returned error: ${responseData['detail']}');
-          if (mounted) {
-            setState(() {
-              _uploadHistory = [];
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('权限错误: ${responseData['detail']}'),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-            );
-          }
-          return; // 不继续处理
-        }
-        
+
         // 检查 data['data'] 的类型，确保它是 List
         final dataList = responseData;
         if (dataList is List) {
           setState(() {
             _uploadHistory = List<Map<String, dynamic>>.from(
               dataList.map((item) {
-                final map = item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item);
+                final map = item is Map<String, dynamic>
+                    ? item
+                    : Map<String, dynamic>.from(item);
                 // 确保字段名正确，兼容后端返回的字段
                 return {
                   'id': map['id'] ?? map['_id'],
                   'fileName': map['fileName'] ?? map['name'] ?? '未知文件',
                   'fileType': map['fileType'] ?? map['type'] ?? 'unknown',
                   'fileSize': map['fileSize'] ?? 0,
-                  'uploaderName': map['uploaderName'] ?? map['uploader']?['username'] ?? '未知用户',
-                  'uploadedAt': map['uploadedAt'] ?? map['created_at'] ?? map['createdAt'],
+                  'uploaderName':
+                      map['uploaderName'] ??
+                      map['uploader']?['username'] ??
+                      '未知用户',
+                  'uploadedAt':
+                      map['uploadedAt'] ??
+                      map['created_at'] ??
+                      map['createdAt'],
                   'status': map['status'] ?? 'unknown',
                   'errorMessage': map['errorMessage'] ?? map['error_message'],
                 };
-              })
+              }),
             );
           });
-          debugPrint('Upload history loaded successfully: ${_uploadHistory.length} records');
+          debugPrint(
+            'Upload history loaded successfully: ${_uploadHistory.length} records',
+          );
           if (_uploadHistory.isNotEmpty) {
             debugPrint('First record: ${_uploadHistory.first}');
           }
         } else if (dataList is Map) {
           // 如果返回的是 Map，可能是单个对象，转换为列表
-          debugPrint('Warning: API returned Map instead of List, converting to List');
+          debugPrint(
+            'Warning: API returned Map instead of List, converting to List',
+          );
           final map = Map<String, dynamic>.from(dataList);
           setState(() {
-            _uploadHistory = [{
-              'id': map['id'] ?? map['_id'],
-              'fileName': map['fileName'] ?? map['name'] ?? '未知文件',
-              'fileType': map['fileType'] ?? map['type'] ?? 'unknown',
-              'fileSize': map['fileSize'] ?? 0,
-              'uploaderName': map['uploaderName'] ?? map['uploader']?['username'] ?? '未知用户',
-              'uploadedAt': map['uploadedAt'] ?? map['created_at'] ?? map['createdAt'],
-              'status': map['status'] ?? 'unknown',
-              'errorMessage': map['errorMessage'] ?? map['error_message'],
-            }];
+            _uploadHistory = [
+              {
+                'id': map['id'] ?? map['_id'],
+                'fileName': map['fileName'] ?? map['name'] ?? '未知文件',
+                'fileType': map['fileType'] ?? map['type'] ?? 'unknown',
+                'fileSize': map['fileSize'] ?? 0,
+                'uploaderName':
+                    map['uploaderName'] ??
+                    map['uploader']?['username'] ??
+                    '未知用户',
+                'uploadedAt':
+                    map['uploadedAt'] ?? map['created_at'] ?? map['createdAt'],
+                'status': map['status'] ?? 'unknown',
+                'errorMessage': map['errorMessage'] ?? map['error_message'],
+              },
+            ];
           });
-          debugPrint('Upload history loaded (converted from Map): ${_uploadHistory.length} records');
+          debugPrint(
+            'Upload history loaded (converted from Map): ${_uploadHistory.length} records',
+          );
         } else {
           // 如果既不是 List 也不是 Map，设置为空列表
-          debugPrint('Warning: API returned unexpected data type: ${dataList.runtimeType}');
+          debugPrint(
+            'Warning: API returned unexpected data type: ${dataList.runtimeType}',
+          );
           setState(() {
             _uploadHistory = [];
           });
         }
       } else {
         // 处理API返回失败的情况
-        debugPrint('API returned success=false: ${data['message'] ?? 'Unknown error'}');
+        debugPrint(
+          'API returned success=false: ${data['message'] ?? 'Unknown error'}',
+        );
         if (mounted) {
           setState(() {
             _uploadHistory = [];
@@ -221,10 +229,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
           SnackBar(
             content: Text('加载上传历史失败: ${e.toString()}'),
             backgroundColor: Theme.of(context).colorScheme.error,
-            action: SnackBarAction(
-              label: '重试',
-              onPressed: _loadUploadHistory,
-            ),
+            action: SnackBarAction(label: '重试', onPressed: _loadUploadHistory),
           ),
         );
       }
@@ -236,13 +241,13 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
       final apiService = ApiService();
       final response = await apiService.get('/api/admin/upload-stats');
       final data = response.data;
-      
+
       // 添加调试日志
       debugPrint('Upload stats API response: $data');
-      
+
       if (data['success'] == true) {
         final responseData = data['data'];
-        
+
         // 检查是否包含错误信息（权限错误等）
         if (responseData is Map && responseData.containsKey('detail')) {
           // 这是错误信息，不是数据
@@ -260,14 +265,16 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
           }
           return; // 不继续处理
         }
-        
+
         setState(() {
           _uploadStats = responseData ?? {};
         });
         debugPrint('Upload stats loaded successfully: $_uploadStats');
       } else {
         // 处理API返回失败的情况
-        debugPrint('API returned success=false: ${data['message'] ?? 'Unknown error'}');
+        debugPrint(
+          'API returned success=false: ${data['message'] ?? 'Unknown error'}',
+        );
         if (mounted) {
           setState(() {
             _uploadStats = {};
@@ -292,10 +299,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
           SnackBar(
             content: Text('加载上传统计失败: ${e.toString()}'),
             backgroundColor: Theme.of(context).colorScheme.error,
-            action: SnackBarAction(
-              label: '重试',
-              onPressed: _loadUploadStats,
-            ),
+            action: SnackBarAction(label: '重试', onPressed: _loadUploadStats),
           ),
         );
       }
@@ -459,9 +463,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
             filename: file.name,
           );
         }
-        formData.files.add(
-          MapEntry('files', multipartFile),
-        );
+        formData.files.add(MapEntry('files', multipartFile));
       }
 
       // 调用API上传知识库
@@ -599,9 +601,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
             filename: file.name,
           );
         }
-        formData.files.add(
-          MapEntry('files', multipartFile),
-        );
+        formData.files.add(MapEntry('files', multipartFile));
       }
 
       // 调用API上传人设卡
@@ -663,8 +663,8 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
         builder: (context, setState) => Dialog(
           insetPadding: const EdgeInsets.all(20),
           child: Container(
-            width: MediaQuery.of(context).size.width > 600 
-                ? MediaQuery.of(context).size.width * 0.6 
+            width: MediaQuery.of(context).size.width > 600
+                ? MediaQuery.of(context).size.width * 0.6
                 : MediaQuery.of(context).size.width * 0.9,
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.8,
@@ -674,10 +674,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '上传知识库',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+                Text('上传知识库', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 20),
                 Expanded(
                   child: SingleChildScrollView(
@@ -748,10 +745,15 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
                                 const SizedBox(height: 4),
                                 ..._knowledgeFiles.map(
                                   (file) => Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.insert_drive_file, size: 16),
+                                        const Icon(
+                                          Icons.insert_drive_file,
+                                          size: 16,
+                                        ),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
@@ -763,7 +765,10 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
                                           ),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.close, size: 16),
+                                          icon: const Icon(
+                                            Icons.close,
+                                            size: 16,
+                                          ),
                                           onPressed: () {
                                             setState(() {
                                               _knowledgeFiles.remove(file);
@@ -815,8 +820,8 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
         builder: (context, setState) => Dialog(
           insetPadding: const EdgeInsets.all(20),
           child: Container(
-            width: MediaQuery.of(context).size.width > 600 
-                ? MediaQuery.of(context).size.width * 0.6 
+            width: MediaQuery.of(context).size.width > 600
+                ? MediaQuery.of(context).size.width * 0.6
                 : MediaQuery.of(context).size.width * 0.9,
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.8,
@@ -826,10 +831,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '上传人设卡',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+                Text('上传人设卡', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 20),
                 Expanded(
                   child: SingleChildScrollView(
@@ -900,10 +902,15 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
                                 const SizedBox(height: 4),
                                 ..._personaFiles.map(
                                   (file) => Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.insert_drive_file, size: 16),
+                                        const Icon(
+                                          Icons.insert_drive_file,
+                                          size: 16,
+                                        ),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
@@ -915,7 +922,10 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
                                           ),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.close, size: 16),
+                                          icon: const Icon(
+                                            Icons.close,
+                                            size: 16,
+                                          ),
                                           onPressed: () {
                                             setState(() {
                                               _personaFiles.remove(file);
@@ -1055,8 +1065,8 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
                               icon: const Icon(Icons.school),
                               label: const Text('上传知识库'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: colorScheme.primary,
-                                foregroundColor: colorScheme.onPrimary,
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1146,15 +1156,15 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     // 根据屏幕宽度动态调整列数
     final crossAxisCount = screenWidth > 1200
         ? 4
         : screenWidth > 800
-            ? 3
-            : screenWidth > 600
-                ? 2
-                : 1;
+        ? 3
+        : screenWidth > 600
+        ? 2
+        : 1;
 
     final stats = [
       {
@@ -1217,7 +1227,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
@@ -1229,24 +1239,51 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
             ],
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
+            // 左侧图标区域
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
               ),
+              child: Icon(icon, color: color, size: 32),
             ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.7),
+            const SizedBox(width: 20),
+            // 右侧文本区域
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 放大的value
+                  Text(
+                    value,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSurface,
+                      height: 1.2,
+                    ),
+                    textAlign: TextAlign.start,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // title文本
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface.withValues(alpha: 0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.start,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
           ],
@@ -1368,7 +1405,13 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      _formatFileSize(upload['fileSize'] is int ? upload['fileSize'] as int? : (upload['fileSize'] is num ? (upload['fileSize'] as num).toInt() : null)),
+                      _formatFileSize(
+                        upload['fileSize'] is int
+                            ? upload['fileSize'] as int?
+                            : (upload['fileSize'] is num
+                                  ? (upload['fileSize'] as num).toInt()
+                                  : null),
+                      ),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
@@ -1458,8 +1501,8 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               // 只有失败状态、目标存在且有文件时，才显示重新处理按钮
-              if (status == 'failed' && 
-                  (upload['target_exists'] ?? true) && 
+              if (status == 'failed' &&
+                  (upload['target_exists'] ?? true) &&
                   (upload['has_files'] ?? true)) ...[
                 TextButton.icon(
                   onPressed: () {
@@ -1590,4 +1633,3 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
     }
   }
 }
-
