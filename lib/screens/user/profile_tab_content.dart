@@ -235,6 +235,24 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
                         Navigator.pushNamed(context, AppRouter.settings);
                       },
                     ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.folder_shared),
+                      title: const Text('我的知识库与人设卡'),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                      onTap: () {
+                        Navigator.pushNamed(context, AppRouter.myContent);
+                      },
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.star),
+                      title: const Text('我的收藏'),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                      onTap: () {
+                        Navigator.pushNamed(context, '/stars');
+                      },
+                    ),
                     // 服务器设置（仅管理员可见）
                     if (userProvider.currentUser?.role == 'admin') ...[
                       const Divider(),

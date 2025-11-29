@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
@@ -18,13 +20,19 @@ class _PersonaScreenState extends State<PersonaScreen>
   late Animation<Offset> _slideAnimation;
 
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _authorController = TextEditingController();
   bool _isSearching = false;
   List<Map<String, dynamic>> _personaList = [];
   List<Map<String, dynamic>> _filteredPersonaList = [];
   String _searchQuery = '';
+  String _authorQuery = '';
   String _selectedSortOption = '最新发布';
   String _selectedCategory = '全部分类';
   bool _isGridView = true;
+  String _currentSortBy = 'created_at';
+  String _currentSortOrder = 'desc';
+  Timer? _searchDebounce;
+  static const _searchDebounceDuration = Duration(milliseconds: 450);
 
   // 添加用户登录状态检查
   bool _isLoggedIn = false;
@@ -63,6 +71,8 @@ class _PersonaScreenState extends State<PersonaScreen>
   void dispose() {
     _animationController.dispose();
     _searchController.dispose();
+    _authorController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -74,15 +84,21 @@ class _PersonaScreenState extends State<PersonaScreen>
     });
   }
 
-  Future<void> _loadPersonaList() async {
-    setState(() {
-      _isSearching = true;
-    });
+  Future<void> _loadPersonaList({bool showLoadingIndicator = true}) async {
+    if (showLoadingIndicator) {
+      setState(() {
+        _isSearching = true;
+      });
+    }
 
     try {
       final apiService = ApiService();
-      // 使用 getPublicPersonas 方法，它会正确处理后端返回的分页格式
-      final response = await apiService.getPublicPersonas();
+      final response = await apiService.getPublicPersonas(
+        name: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+        uploaderId: _authorQuery.trim().isEmpty ? null : _authorQuery.trim(),
+        sortBy: _currentSortBy,
+        sortOrder: _currentSortOrder,
+      );
       
       setState(() {
         // 将 Persona 对象转换为 Map，以便在 UI 中使用
@@ -100,7 +116,7 @@ class _PersonaScreenState extends State<PersonaScreen>
           'download_url': persona.downloadUrl,
           'preview_url': persona.previewUrl,
         }).toList();
-        _filteredPersonaList = _personaList;
+        _filteredPersonaList = _applyLocalFilters(_personaList);
         _isSearching = false;
       });
     } catch (e) {
@@ -118,65 +134,68 @@ class _PersonaScreenState extends State<PersonaScreen>
     }
   }
 
-  void _filterPersonaList(String query) {
+  List<Map<String, dynamic>> _applyLocalFilters(
+    List<Map<String, dynamic>> source,
+  ) {
+    if (_selectedCategory == '全部分类') {
+      return List<Map<String, dynamic>>.from(source);
+    }
+
+    return source.where((persona) {
+      final tags = persona['tags'] as List<dynamic>? ?? [];
+      return tags.contains(_selectedCategory);
+    }).toList();
+  }
+
+  void _onSearchChanged(String query) {
     setState(() {
       _searchQuery = query;
-      if (query.isEmpty) {
-        _filteredPersonaList = List.from(_personaList);
-      } else {
-        _filteredPersonaList = _personaList.where((persona) {
-          final name = persona['name']?.toString().toLowerCase() ?? '';
-          final description = persona['description']?.toString().toLowerCase() ?? '';
-          final searchQuery = query.toLowerCase();
-          return name.contains(searchQuery) || description.contains(searchQuery);
-        }).toList();
-      }
     });
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      _searchDebounceDuration,
+      () => _loadPersonaList(showLoadingIndicator: false),
+    );
   }
 
   void _sortPersonaList(String sortOption) {
+    Map<String, String> sortConfig;
     setState(() {
       _selectedSortOption = sortOption;
-      switch (sortOption) {
-        case '最新发布':
-          _filteredPersonaList.sort((a, b) {
-            final aTime =
-                DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
-            final bTime =
-                DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
-            return bTime.compareTo(aTime);
-          });
-          break;
-        case '最多收藏':
-          _filteredPersonaList.sort((a, b) {
-            final aStars = int.tryParse(a['stars']?.toString() ?? '0') ?? 0;
-            final bStars = int.tryParse(b['stars']?.toString() ?? '0') ?? 0;
-            return bStars.compareTo(aStars);
-          });
-          break;
-        case '名称排序':
-          _filteredPersonaList.sort((a, b) {
-            final aName = a['name']?.toString() ?? '';
-            final bName = b['name']?.toString() ?? '';
-            return aName.compareTo(bName);
-          });
-          break;
-      }
+      sortConfig = _resolveSortConfig(sortOption);
+      _currentSortBy = sortConfig['sortBy']!;
+      _currentSortOrder = sortConfig['sortOrder']!;
     });
+    _loadPersonaList();
+  }
+
+  Map<String, String> _resolveSortConfig(String sortOption) {
+    switch (sortOption) {
+      case '最多收藏':
+        return {'sortBy': 'star_count', 'sortOrder': 'desc'};
+      case '名称排序':
+        return {'sortBy': 'name', 'sortOrder': 'asc'};
+      case '最新发布':
+      default:
+        return {'sortBy': 'created_at', 'sortOrder': 'desc'};
+    }
   }
 
   void _filterByCategory(String category) {
     setState(() {
       _selectedCategory = category;
-      if (category == '全部分类') {
-        _filteredPersonaList = List.from(_personaList);
-      } else {
-        _filteredPersonaList = _personaList.where((persona) {
-          final tags = persona['tags'] as List<dynamic>? ?? [];
-          return tags.contains(category);
-        }).toList();
-      }
+      _filteredPersonaList = _applyLocalFilters(_personaList);
     });
+  }
+
+  void _onAuthorChanged(String value) {
+    setState(() {
+      _authorQuery = value;
+    });
+  }
+
+  void _applyAuthorFilter() {
+    _loadPersonaList();
   }
 
   // 导航到上传页面
@@ -253,7 +272,29 @@ class _PersonaScreenState extends State<PersonaScreen>
                           vertical: 16,
                         ),
                       ),
-                      onChanged: _filterPersonaList,
+                      onChanged: _onSearchChanged,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _authorController,
+                      decoration: InputDecoration(
+                        hintText: '按作者ID筛选',
+                        prefixIcon: const Icon(Icons.person_search),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.filter_alt),
+                          tooltip: '应用作者筛选',
+                          onPressed: _applyAuthorFilter,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                      onChanged: _onAuthorChanged,
+                      onSubmitted: (_) => _applyAuthorFilter(),
                     ),
                     const SizedBox(height: 16),
                     // 筛选选项

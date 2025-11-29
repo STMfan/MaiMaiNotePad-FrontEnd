@@ -16,6 +16,8 @@ class Persona {
   final String? author;
   @JsonKey(name: 'author_id')
   final String? authorId;
+  @JsonKey(name: 'copyright_owner')
+  final String? copyrightOwner;
   @JsonKey(defaultValue: [])
   final List<String> tags;
   @JsonKey(name: 'star_count', defaultValue: 0)
@@ -40,8 +42,8 @@ class Persona {
 
   // 添加便利属性
   String get title => name;
-  String get authorName => author ?? uploaderId; // 优先使用author，否则使用uploaderId
-  String get uploaderName => authorName; // 兼容旧代码
+  String get authorName => author ?? copyrightOwner ?? uploaderId; // 优先使用作者、版权信息，否则上传者
+  String get uploaderName => uploaderId; // 兼容旧代码
   String get copyright => ''; // 兼容旧代码
 
   Persona({
@@ -52,6 +54,7 @@ class Persona {
     required this.uploaderId,
     this.author,
     this.authorId,
+    this.copyrightOwner,
     this.tags = const [],
     required this.starCount,
     this.stars = 0,

@@ -7,6 +7,7 @@ import '../screens/message/screens.dart';
 import '../screens/shared/screens.dart';
 
 import '../models/knowledge.dart';
+import '../models/persona.dart';
 
 class AppRouter {
   static const String home = '/';
@@ -22,6 +23,8 @@ class AppRouter {
   static const String messageDetail = '/message_detail';
   static const String upload = '/upload';
   static const String editKnowledge = '/editKnowledge';
+  static const String editPersona = '/editPersona';
+  static const String myContent = '/my_content';
 
   // 创建带动画的路由
   static Route<T> _createRoute<T>(
@@ -72,6 +75,8 @@ class AppRouter {
         return _createRoute(const AboutScreen(), settings);
       case AppRouter.settings:
         return _createRoute(const SettingsScreen(), settings);
+      case myContent:
+        return _createRoute(const MyContentScreen(), settings);
       case '/stars':
         return _createRoute(const StarsScreen(), settings);
       case knowledgeDetail:
@@ -105,10 +110,34 @@ class AppRouter {
         );
       // Upload路由已删除，统一上传功能通过管理页面提供
       case editKnowledge:
-        final args = settings.arguments as Map<String, dynamic>?;
-        final knowledge = args?['knowledge'] as Knowledge?;
+        Knowledge? knowledge;
+        if (settings.arguments is Knowledge) {
+          knowledge = settings.arguments as Knowledge;
+        } else if (settings.arguments is Map<String, dynamic>) {
+          final args = settings.arguments as Map<String, dynamic>;
+          if (args['knowledge'] is Knowledge) {
+            knowledge = args['knowledge'] as Knowledge;
+          } else if (args['knowledge'] is Map<String, dynamic>) {
+            knowledge = Knowledge.fromJson(
+              args['knowledge'] as Map<String, dynamic>,
+            );
+          }
+        }
         return _createRoute(
           EditKnowledgeScreen(knowledge: knowledge!),
+          settings,
+        );
+      case editPersona:
+        final args = settings.arguments as Map<String, dynamic>?;
+        final rawPersona = args?['persona'];
+        Persona? persona;
+        if (rawPersona is Persona) {
+          persona = rawPersona;
+        } else if (rawPersona is Map<String, dynamic>) {
+          persona = Persona.fromJson(rawPersona);
+        }
+        return _createRoute(
+          EditPersonaScreen(persona: persona!),
           settings,
         );
       default:

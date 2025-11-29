@@ -1,149 +1,178 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../models/knowledge.dart';
 import '../../models/persona.dart';
-import '../../providers/user_provider.dart';
-import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
+import '../../viewmodels/stars_viewmodel.dart';
 import '../knowledge/detail_screen.dart';
 import '../persona/detail_screen.dart';
 
-class StarsScreen extends StatefulWidget {
+class StarsScreen extends StatelessWidget {
   const StarsScreen({super.key});
 
   @override
-  _StarsScreenState createState() => _StarsScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => StarsViewModel()..init(),
+      child: const DefaultTabController(
+        length: 2,
+        child: _StarsView(),
+      ),
+    );
+  }
 }
 
-class _StarsScreenState extends State<StarsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  List<Knowledge> _starredKnowledge = [];
-  List<Persona> _starredPersonas = [];
-  bool _isLoading = true;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadStarredItems();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadStarredItems() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final apiService = ApiService();
-
-      final starsData = await apiService.getUserStars(userProvider.token!, includeDetails: true);
-
-      setState(() {
-        _starredKnowledge = starsData['knowledge'] ?? [];
-        _starredPersonas = starsData['personas'] ?? [];
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = '加载收藏内容失败: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _refreshData() async {
-    await _loadStarredItems();
-  }
+class _StarsView extends StatelessWidget {
+  const _StarsView();
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<StarsViewModel>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('我的收藏'),
         backgroundColor: AppTheme.primaryOrange,
         foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
+        actions: [
+          PopupMenuButton<Map<String, String>>(
+            icon: const Icon(Icons.sort),
+            onSelected: (value) {
+              final sortBy = value['sortBy'] ?? 'created_at';
+              final sortOrder = value['sortOrder'] ?? 'desc';
+              context
+                  .read<StarsViewModel>()
+                  .changeSort(sortBy: sortBy, sortOrder: sortOrder);
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: {'sortBy': 'created_at', 'sortOrder': 'desc'},
+                child: Text('按收藏时间（新→旧）'),
+              ),
+              PopupMenuItem(
+                value: {'sortBy': 'created_at', 'sortOrder': 'asc'},
+                child: Text('按收藏时间（旧→新）'),
+              ),
+              PopupMenuItem(
+                value: {'sortBy': 'star_count', 'sortOrder': 'desc'},
+                child: Text('按收藏数（高→低）'),
+              ),
+            ],
+          ),
+        ],
+        bottom: const TabBar(
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
-          tabs: const [
+          tabs: [
             Tab(text: '知识库'),
             Tab(text: '人设卡'),
           ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _errorMessage!,
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _refreshData,
-                    child: const Text('重试'),
-                  ),
-                ],
-              ),
-            )
-          : TabBarView(
-              controller: _tabController,
-              children: [_buildKnowledgeList(), _buildPersonaList()],
+      body: Stack(
+        children: [
+          TabBarView(
+            children: [
+              _KnowledgeList(viewModel: viewModel),
+              _PersonaList(viewModel: viewModel),
+            ],
+          ),
+          if (viewModel.isBusy)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(minHeight: 2),
             ),
+        ],
+      ),
     );
   }
+}
 
-  Widget _buildKnowledgeList() {
-    if (_starredKnowledge.isEmpty) {
-      return const Center(child: Text('暂无收藏的知识库'));
+class _KnowledgeList extends StatelessWidget {
+  const _KnowledgeList({required this.viewModel});
+
+  final StarsViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final knowledge = viewModel.knowledge;
+    if (viewModel.errorMessage != null && knowledge.isEmpty) {
+      return _ErrorView(
+        message: viewModel.errorMessage!,
+        onRetry: () => context.read<StarsViewModel>().refresh(type: 'knowledge'),
+      );
+    }
+    if (knowledge.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: () => context.read<StarsViewModel>().refresh(type: 'knowledge'),
+        child: ListView(
+          children: const [
+            SizedBox(height: 120),
+            Center(child: Text('暂无收藏的知识库')),
+          ],
+        ),
+      );
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshData,
+      onRefresh: () => context.read<StarsViewModel>().refresh(type: 'knowledge'),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _starredKnowledge.length,
+        itemCount: knowledge.length + (viewModel.knowledgeHasMore ? 1 : 0),
         itemBuilder: (context, index) {
-          final knowledge = _starredKnowledge[index];
+          if (index >= knowledge.length) {
+            context.read<StarsViewModel>().loadMore(type: 'knowledge');
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.0),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          final item = knowledge[index];
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
             elevation: 4,
             child: ListTile(
               title: Text(
-                knowledge.title,
+                item.title,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle: Text(
-                knowledge.description,
+                item.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              trailing: const Icon(Icons.arrow_forward_ios),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.star, color: Colors.amber),
+                    tooltip: '取消收藏',
+                    onPressed: () async {
+                      try {
+                        await context.read<StarsViewModel>().unstarKnowledge(item.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已取消收藏')),
+                        );
+                      } catch (_) {}
+                    },
+                  ),
+                  const Icon(Icons.arrow_forward_ios),
+                ],
+              ),
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) =>
-                        KnowledgeDetailScreen(knowledgeId: knowledge.id),
+                        KnowledgeDetailScreen(knowledgeId: item.id),
                   ),
-                ).then((_) => _refreshData());
+                ).then((_) => context
+                    .read<StarsViewModel>()
+                    .refresh(type: 'knowledge'));
               },
             ),
           );
@@ -151,19 +180,48 @@ class _StarsScreenState extends State<StarsScreen>
       ),
     );
   }
+}
 
-  Widget _buildPersonaList() {
-    if (_starredPersonas.isEmpty) {
-      return const Center(child: Text('暂无收藏的人设卡'));
+class _PersonaList extends StatelessWidget {
+  const _PersonaList({required this.viewModel});
+
+  final StarsViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final personas = viewModel.personas;
+    if (viewModel.errorMessage != null && personas.isEmpty) {
+      return _ErrorView(
+        message: viewModel.errorMessage!,
+        onRetry: () => context.read<StarsViewModel>().refresh(type: 'persona'),
+      );
+    }
+    if (personas.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: () => context.read<StarsViewModel>().refresh(type: 'persona'),
+        child: ListView(
+          children: const [
+            SizedBox(height: 120),
+            Center(child: Text('暂无收藏的人设卡')),
+          ],
+        ),
+      );
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshData,
+      onRefresh: () => context.read<StarsViewModel>().refresh(type: 'persona'),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _starredPersonas.length,
+        itemCount: personas.length + (viewModel.personaHasMore ? 1 : 0),
         itemBuilder: (context, index) {
-          final persona = _starredPersonas[index];
+          if (index >= personas.length) {
+            context.read<StarsViewModel>().loadMore(type: 'persona');
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.0),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          final persona = personas[index];
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
             elevation: 4,
@@ -177,7 +235,24 @@ class _StarsScreenState extends State<StarsScreen>
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              trailing: const Icon(Icons.arrow_forward_ios),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.star, color: Colors.amber),
+                    tooltip: '取消收藏',
+                    onPressed: () async {
+                      try {
+                        await context.read<StarsViewModel>().unstarPersona(persona.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已取消收藏')),
+                        );
+                      } catch (_) {}
+                    },
+                  ),
+                  const Icon(Icons.arrow_forward_ios),
+                ],
+              ),
               onTap: () {
                 Navigator.push(
                   context,
@@ -185,7 +260,8 @@ class _StarsScreenState extends State<StarsScreen>
                     builder: (context) =>
                         PersonaDetailScreen(personaId: persona.id),
                   ),
-                ).then((_) => _refreshData());
+                ).then(
+                    (_) => context.read<StarsViewModel>().refresh(type: 'persona'));
               },
             ),
           );
@@ -194,3 +270,29 @@ class _StarsScreenState extends State<StarsScreen>
     );
   }
 }
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(message),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: onRetry,
+            child: const Text('重试'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+

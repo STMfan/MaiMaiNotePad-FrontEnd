@@ -1,5 +1,54 @@
 # 修改日志 (CHANGELOG)
 
+## 2025-11-25 - 前端功能与错误处理增强
+
+### 1. 服务层与会话处理
+- 引入 `core/api_error.dart` 结构化错误，统一展示 message/code/requestId/details
+- 新增 `SessionStore` 全局 401 回调，自动清理 Session 并跳转登录
+- API 调用接受 4xx 为异常，增强错误解包、JSON 兼容与调试输出
+- 调整分页解析防止单条失败导致整体丢弃
+
+**修改位置：**
+- `lib/services/api_service.dart`
+- `lib/services/core/api_error.dart`
+- `lib/services/core/session_store.dart`
+- `lib/services/core/http_client_factory.dart`
+- `lib/models/paginated_response.dart`
+
+### 2. 收藏与详情体验
+- 收藏列表支持分页、排序、含详情；Star 状态单接口检查
+- 知识库详情新增文件列表、单文件下载/删除、收藏计数实时刷新
+- 消息详情改用 ViewModel，支持标记已读/删除的加载状态
+
+**修改位置：**
+- `lib/repositories/*`，`lib/services/api/*`，`lib/viewmodels/*`
+- `lib/screens/user/stars_screen.dart`
+- `lib/screens/knowledge/detail_screen.dart`
+- `lib/screens/message/message_detail_screen.dart`
+
+### 3. 内容管理与后台
+- 新增“我的内容”管理页：分页、搜索/标签/上传者筛选、排序、删除
+- 公开/用户内容列表支持分页、排序、上传者筛选
+- 管理端内容管理支持上传者过滤、排序、跳转编辑
+- 支持知识库单文件删除、Persona 更新接口
+
+**修改位置：**
+- `lib/screens/user/my_content_screen.dart`
+- `lib/screens/knowledge/knowledge_screen.dart`
+- `lib/screens/persona/persona_screen.dart`
+- `lib/screens/admin/content_management_tab_content.dart`
+- `lib/services/api_service.dart`
+
+### 4. 其他改进
+- 登录页错误解析增强：解析 requestId/详情并友好提示
+- README 补充“我的内容”入口与新版接口说明
+
+**修改位置：**
+- `lib/screens/user/login_screen.dart`
+- `README.md`
+
+---
+
 ## 2025-11-23 - API接口优化和性能提升
 
 ### 更新内容
@@ -352,5 +401,11 @@ Future<String?> _getToken() async {
 - `lib/models/persona.dart` - 人设卡模型
 - `lib/screens/admin/` - 管理员相关页面
 - `lib/screens/messages/` - 消息相关页面
+
+
+
+
+
+
 
 

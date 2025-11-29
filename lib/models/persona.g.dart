@@ -14,6 +14,7 @@ Persona _$PersonaFromJson(Map<String, dynamic> json) => Persona(
   uploaderId: json['uploader_id'] as String? ?? '',
   author: json['author'] as String?,
   authorId: json['author_id'] as String?,
+  copyrightOwner: json['copyright_owner'] as String?,
   tags:
       (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
   starCount: (json['star_count'] as num?)?.toInt() ?? 0,
@@ -41,6 +42,7 @@ Map<String, dynamic> _$PersonaToJson(Persona instance) => <String, dynamic>{
   'uploader_id': instance.uploaderId,
   'author': instance.author,
   'author_id': instance.authorId,
+  'copyright_owner': instance.copyrightOwner,
   'tags': instance.tags,
   'star_count': instance.starCount,
   'stars': instance.stars,
