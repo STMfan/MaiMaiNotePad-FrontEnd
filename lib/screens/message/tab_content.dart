@@ -18,7 +18,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
   List<Message> _messages = [];
   bool _isLoading = true;
   String? _error;
-  Set<String> _selectedMessageIds = {}; // 选中的消息ID集合
+ final Set<String> _selectedMessageIds = {}; // 选中的消息ID集合
   bool _isSelectionMode = false; // 是否处于选择模式
 
   @override
@@ -51,7 +51,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
       });
     } catch (e) {
       setState(() {
-        _error = '加载消息失败: ${e.toString()}';
+        _error = '加载消息失败: $e';
         _isLoading = false;
       });
     }
@@ -100,7 +100,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('删除消息失败: ${e.toString()}'),
+            content: Text('删除消息失败: $e'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -155,7 +155,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('批量删除失败: ${e.toString()}'),
+            content: Text('批量删除失败: $e'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -189,7 +189,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('标记已读失败: ${e.toString()}')),
+          SnackBar(content: Text('标记已读失败: $e')),
         );
       }
     }
@@ -456,7 +456,7 @@ class _MessageTabContentState extends State<MessageTabContent> {
     return Card(
       elevation: 1,
       margin: EdgeInsets.only(bottom: isLargeScreen ? 12 : 8),
-      color: isSelected ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3) : null,
+      color: isSelected ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3) : null,
       child: InkWell(
         onTap: _isSelectionMode
             ? () => _toggleMessageSelection(message.id)
@@ -592,10 +592,10 @@ class _MessageTabContentState extends State<MessageTabContent> {
     ].reduce((a, b) => a > b ? a : b);
     
     if (lastPunctuation > 75) {  // 如果标点位置合理
-      return truncated.substring(0, lastPunctuation + 1);
-    }
+       return truncated.substring(0, lastPunctuation + 1);
+      }
     
-    return truncated + '...';
+    return '$truncated...';
   }
 
   String _formatDate(DateTime date) {

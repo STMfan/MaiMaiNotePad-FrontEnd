@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:file_picker/file_picker.dart';
+
 import '../../models/knowledge.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
@@ -27,19 +26,19 @@ class _EditKnowledgeScreenState extends State<EditKnowledgeScreen> {
   
   bool _isLoading = false;
   bool _isPublic = false;
-  List<String> _selectedFiles = [];
   List<String> _tags = [];
 
   @override
   void initState() {
     super.initState();
     // 初始化表单数据
-    _nameController.text = widget.knowledge.title;
-    _descriptionController.text = widget.knowledge.description;
-    _tagsController.text = widget.knowledge.tags.join(', ');
-    _copyrightController.text = widget.knowledge.copyright ?? '';
-    _isPublic = widget.knowledge.isPublic;
-    _tags = List.from(widget.knowledge.tags);
+    final knowledge = widget.knowledge;
+    _nameController.text = knowledge.title;
+    _descriptionController.text = knowledge.description;
+    _tagsController.text = knowledge.tags.join(', ');
+    _copyrightController.text = knowledge.copyright;
+    _isPublic = knowledge.isPublic;
+    _tags = List.from(knowledge.tags);
   }
 
   @override
@@ -49,38 +48,6 @@ class _EditKnowledgeScreenState extends State<EditKnowledgeScreen> {
     _tagsController.dispose();
     _copyrightController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickFiles() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        type: FileType.any,
-      );
-
-      if (result != null) {
-        setState(() {
-          if (kIsWeb) {
-            // Web 平台：使用文件名作为标识
-            _selectedFiles = result.files.map((file) => file.name).toList();
-          } else {
-            // 其他平台：使用文件路径
-            _selectedFiles = result.paths
-                .where((path) => path != null)
-                .map((path) => path!)
-                .toList();
-          }
-        });
-      }
-    } catch (e) {
-      _showError('选择文件失败: ${e.toString()}');
-    }
-  }
-
-  void _removeFile(int index) {
-    setState(() {
-      _selectedFiles.removeAt(index);
-    });
   }
 
   void _updateTags() {
@@ -93,7 +60,8 @@ class _EditKnowledgeScreenState extends State<EditKnowledgeScreen> {
   }
 
   Future<void> _updateKnowledge() async {
-    if (!_formKey.currentState!.validate()) return;
+    final currentState = _formKey.currentState;
+    if (currentState?.validate() != true) return;
 
     setState(() {
       _isLoading = true;

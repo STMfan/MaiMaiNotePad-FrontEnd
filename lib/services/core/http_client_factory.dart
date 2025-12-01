@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
-import '../../constants/app_constants.dart';
+
 import 'session_store.dart';
 
 class HttpClientFactory {

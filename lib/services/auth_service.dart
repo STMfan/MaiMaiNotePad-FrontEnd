@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
@@ -122,18 +121,14 @@ class AuthService {
 
         // 尝试不同的token字段名
         var token = data['access_token'];
-        if (token == null) {
-          token = data['token'];
-        }
+        token ??= data['token'];
 
         // 如果根级别没有找到token，尝试从data对象中获取
         if (token == null && data['data'] != null) {
           final innerData = data['data'];
           if (innerData is Map) {
             token = innerData['access_token'];
-            if (token == null) {
-              token = innerData['token'];
-            }
+            token ??= innerData['token'];
           }
         }
 
@@ -179,12 +174,8 @@ class AuthService {
               if (jwtPayload is Map) {
                 // 尝试不同的用户ID字段
                 var jwtUserId = jwtPayload['sub'];
-                if (jwtUserId == null) {
-                  jwtUserId = jwtPayload['id'];
-                  if (jwtUserId == null) {
-                    jwtUserId = jwtPayload['user_id'];
-                  }
-                }
+                jwtUserId ??= jwtPayload['id'];
+                jwtUserId ??= jwtPayload['user_id'];
 
                 user = {
                   'id': jwtUserId,
@@ -289,10 +280,7 @@ class AuthService {
         }
 
         // 检查用户对象的关键字段
-        var userId = user['id'];
-        if (userId == null) {
-          userId = user['user_id'];
-        }
+        var userId = user['id'] ?? user['user_id'];
 
         if (userId == null) {
           return {
@@ -306,7 +294,7 @@ class AuthService {
         final prefs = await SharedPreferences.getInstance();
         // 检查 token 是否已经保存（可能在调用 /api/users/me 时已保存）
         final existingToken = prefs.getString(AppConstants.tokenKey);
-        if (existingToken == null || existingToken != token.toString()) {
+        if (existingToken != token.toString()) {
           await prefs.setString(AppConstants.tokenKey, token.toString());
         }
         await prefs.setString(AppConstants.userIdKey, userId.toString());

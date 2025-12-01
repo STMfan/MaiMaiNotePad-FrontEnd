@@ -50,15 +50,15 @@ class _ParsedErrorMessage {
         requestId = line.split(':').skip(1).join(':').trim();
       } else if (line.startsWith('详情')) {
         final detailText = line.split(':').skip(1).join(':').trim();
-        details = (details == null || details!.isEmpty)
+        details = (details == null || details.isEmpty)
             ? detailText
-            : '${details!}\n$detailText';
+            : '$details\n$detailText';
       } else if (description.isEmpty) {
         description = line;
       } else {
-        details = (details == null || details!.isEmpty)
+        details = (details == null || details.isEmpty)
             ? line
-            : '${details!}\n$line';
+            : '$details\n$line';
       }
     }
 
@@ -91,7 +91,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
+    final currentState = _formKey.currentState;
+    if (currentState?.validate() == true) {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final success = await userProvider.login(
         _usernameController.text.trim(),

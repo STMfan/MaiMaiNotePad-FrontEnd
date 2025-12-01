@@ -26,7 +26,6 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
   final TextEditingController _uploaderController = TextEditingController();
   String _selectedSortOption = '最新发布';
   String _selectedCategory = '全部分类';
-  String _selectedOrder = 'desc';
   final List<Map<String, String>> _sortOptions = const [
     {'label': '最新发布', 'sortBy': 'created_at', 'sortOrder': 'desc'},
     {'label': '最早发布', 'sortBy': 'created_at', 'sortOrder': 'asc'},
@@ -214,18 +213,6 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
     _loadKnowledgeList();
   }
 
-  Map<String, String> _resolveSortConfig(String sortOption) {
-    switch (sortOption) {
-      case '最多收藏':
-        return {'sortBy': 'star_count', 'sortOrder': 'desc'};
-      case '名称排序':
-        return {'sortBy': 'name', 'sortOrder': 'asc'};
-      case '最新发布':
-      default:
-        return {'sortBy': 'created_at', 'sortOrder': 'desc'};
-    }
-  }
-
   void _filterByCategory(String category) {
     setState(() {
       _selectedCategory = category;
@@ -256,7 +243,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
         mediaQuery.size.width > 800 && mediaQuery.size.width <= 1200;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text('知识库'),
         backgroundColor: theme.colorScheme.surface,
@@ -285,7 +272,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
                   color: theme.colorScheme.surface,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -338,7 +325,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
                         // 分类筛选
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _selectedCategory,
+                            initialValue: _selectedCategory,
                             decoration: InputDecoration(
                               labelText: '分类',
                               border: OutlineInputBorder(
@@ -368,7 +355,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
                         // 排序选项
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _selectedSortOption,
+                            initialValue: _selectedSortOption,
                             decoration: InputDecoration(
                               labelText: '排序',
                               border: OutlineInputBorder(
@@ -412,16 +399,16 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
                             Icon(
                               Icons.folder_open,
                               size: 64,
-                              color: theme.colorScheme.onBackground.withOpacity(
-                                0.5,
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.5,
                               ),
                             ),
                             const SizedBox(height: 16),
                             Text(
                               '暂无知识库',
                               style: theme.textTheme.headlineSmall?.copyWith(
-                                color: theme.colorScheme.onBackground
-                                    .withOpacity(0.5),
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.5),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -430,8 +417,8 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
                                   ? '没有找到匹配的知识库'
                                   : '还没有人上传知识库',
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onBackground
-                                    .withOpacity(0.5),
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.5),
                               ),
                             ),
                           ],
@@ -452,9 +439,9 @@ class _KnowledgeScreenState extends State<KnowledgeScreen>
       // 添加上传按钮
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToUpload,
+        tooltip: _isLoggedIn ? '上传知识库' : '请先登录后上传知识库',
         icon: const Icon(Icons.add),
         label: Text(_isLoggedIn ? '上传知识库' : '登录后上传'),
-        tooltip: _isLoggedIn ? '上传知识库' : '请先登录后上传知识库',
       ),
     );
   }
@@ -524,10 +511,10 @@ class KnowledgeCard extends StatelessWidget {
   final bool isListView;
 
   const KnowledgeCard({
-    super.key,
     required this.knowledge,
     required this.onTap,
     this.isListView = false,
+    super.key,
   });
 
   @override
@@ -565,7 +552,7 @@ class KnowledgeCard extends StatelessWidget {
                   Icon(
                     Icons.person,
                     size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                   const SizedBox(width: 4),
                   Text(uploaderId, style: theme.textTheme.bodySmall),
@@ -574,7 +561,7 @@ class KnowledgeCard extends StatelessWidget {
                     Icon(
                       Icons.copyright,
                       size: 16,
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                     const SizedBox(width: 4),
                     Text(copyrightOwner, style: theme.textTheme.bodySmall),
@@ -601,22 +588,22 @@ class KnowledgeCard extends StatelessWidget {
             Container(
               height: 120,
               width: double.infinity,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    theme.colorScheme.primary.withOpacity(0.8),
-                    theme.colorScheme.primary.withOpacity(0.4),
+                    theme.colorScheme.primary.withValues(alpha: 0.8),
+                    theme.colorScheme.primary.withValues(alpha: 0.4),
                   ],
                 ),
               ),
               child: Icon(
                 Icons.folder,
                 size: 48,
-                color: theme.colorScheme.onPrimary.withOpacity(0.8),
+                color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
               ),
-              alignment: Alignment.center,
             ),
 
             // 内容区域
@@ -650,7 +637,7 @@ class KnowledgeCard extends StatelessWidget {
                       Icon(
                         Icons.person,
                         size: 14,
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                       const SizedBox(width: 2),
                       Text(

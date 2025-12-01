@@ -1,26 +1,25 @@
 // Web 环境下的下载实现
 // 使用条件导入，仅在 web 环境下编译
 
-import 'dart:html' as html;
-import 'dart:typed_data';
+import 'dart:convert';
+import 'package:web/web.dart' as web;
 
 /// Web 环境下的下载实现
 /// 使用 Blob URL 触发浏览器下载
 Future<bool> downloadFileWeb(List<int> bytes, String filename) async {
   try {
-    // 创建 Blob
-    final blob = html.Blob([Uint8List.fromList(bytes)]);
-    final url = html.Url.createObjectUrlFromBlob(blob);
+    // 创建临时HTML元素触发下载
+    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
 
-    // 创建 <a> 标签并触发下载
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', filename)
-      ..click();
+    // 将字节数据转换为base64字符串
+    final base64Data = base64Encode(bytes);
 
-    // 清理 URL（延迟清理，确保下载已开始）
-    Future.delayed(const Duration(seconds: 1), () {
-      html.Url.revokeObjectUrl(url);
-    });
+    anchor.href = 'data:application/octet-stream;base64,$base64Data';
+    anchor.download = filename;
+
+    web.document.body!.appendChild(anchor);
+    anchor.click();
+    web.document.body!.removeChild(anchor);
 
     return true;
   } catch (e) {
@@ -29,4 +28,3 @@ Future<bool> downloadFileWeb(List<int> bytes, String filename) async {
     return false;
   }
 }
-

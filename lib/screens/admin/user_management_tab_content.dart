@@ -225,7 +225,7 @@ class _UserManagementTabContentState extends State<UserManagementTabContent> {
               Text('当前角色: $currentRole'),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: selectedRole,
+                initialValue: selectedRole,
                 decoration: const InputDecoration(
                   labelText: '选择新角色',
                   border: OutlineInputBorder(),
@@ -361,7 +361,7 @@ class _UserManagementTabContentState extends State<UserManagementTabContent> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: selectedRole,
+                      initialValue: selectedRole,
                       decoration: const InputDecoration(
                         labelText: '角色',
                         border: OutlineInputBorder(),
@@ -614,7 +614,7 @@ class _UserManagementTabContentState extends State<UserManagementTabContent> {
                                 ),
                                 backgroundColor: _getRoleColor(
                                   user['role'] ?? 'user',
-                                ).withOpacity(0.2),
+                                ).withValues(alpha: 0.2),
                                 labelStyle: TextStyle(
                                   color: _getRoleColor(user['role'] ?? 'user'),
                                 ),

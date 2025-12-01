@@ -18,7 +18,7 @@ class _MessageManagementTabContentState
   bool _isLoading = false;
   String? _error;
   int _currentPage = 1;
-  int _total = 0;
+  // int _total = 0;  // 未使用
   bool _hasMore = true;
 
   @override
@@ -65,7 +65,7 @@ class _MessageManagementTabContentState
           } else {
             _broadcastMessages.addAll(messages);
           }
-          _total = response['total'] ?? messages.length;
+          // _total = response['total'] ?? messages.length;  // 未使用
           _hasMore = messages.length >= 20;
           _isLoading = false;
         });
@@ -144,11 +144,10 @@ class _MessageManagementTabContentState
                 Text(
                   '此公告将发送给所有用户',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.6),
-                      ),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
               ],
             ),
@@ -272,250 +271,224 @@ class _MessageManagementTabContentState
             child: _isLoading && _broadcastMessages.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null && _broadcastMessages.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: 48,
-                              color: colorScheme.error,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              '加载失败: $_error',
-                              style: theme.textTheme.bodyLarge,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () => _loadBroadcastMessages(
-                                resetPage: true,
-                              ),
-                              child: const Text('重试'),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: colorScheme.error,
                         ),
-                      )
-                    : _broadcastMessages.isEmpty
-                        ? Center(
+                        const SizedBox(height: 16),
+                        Text('加载失败: $_error', style: theme.textTheme.bodyLarge),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () =>
+                              _loadBroadcastMessages(resetPage: true),
+                          child: const Text('重试'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _broadcastMessages.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.campaign_outlined,
+                          size: 48,
+                          color: colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '暂无广播消息',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () => _loadBroadcastMessages(resetPage: true),
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _broadcastMessages.length + (_hasMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index >= _broadcastMessages.length) {
+                          // 加载更多
+                          if (!_isLoading && _hasMore) {
+                            _currentPage++;
+                            _loadBroadcastMessages();
+                          }
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+
+                        final message = _broadcastMessages[index];
+                        final stats =
+                            message['stats'] as Map<String, dynamic>? ?? {};
+                        final sender =
+                            message['sender'] as Map<String, dynamic>? ?? {};
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
                             child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  Icons.campaign_outlined,
-                                  size: 48,
-                                  color: colorScheme.onSurface.withValues(
-                                    alpha: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '暂无广播消息',
-                                  style: theme.textTheme.bodyLarge?.copyWith(
-                                    color: colorScheme.onSurface.withValues(
-                                      alpha: 0.6,
+                                // 标题和发送者
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            message['title'] ?? '无标题',
+                                            style: theme.textTheme.titleLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.person,
+                                                size: 16,
+                                                color: colorScheme.onSurface
+                                                    .withValues(alpha: 0.6),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                sender['username'] ?? '未知用户',
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.6,
+                                                          ),
+                                                    ),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Icon(
+                                                Icons.access_time,
+                                                size: 16,
+                                                color: colorScheme.onSurface
+                                                    .withValues(alpha: 0.6),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                _formatDate(
+                                                  message['created_at'],
+                                                ),
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.6,
+                                                          ),
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primary.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '系统公告',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: colorScheme.primary,
+                                              fontSize: 10,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // 内容
+                                Text(
+                                  message['content'] ?? '无内容',
+                                  style: theme.textTheme.bodyMedium,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 12),
+                                // 统计信息
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.3),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceAround,
+                                    children: [
+                                      _buildStatItem(
+                                        '发送数量',
+                                        '${stats['total_count'] ?? 0}',
+                                        Icons.send,
+                                        colorScheme.primary,
+                                      ),
+                                      _buildStatItem(
+                                        '已读数量',
+                                        '${stats['read_count'] ?? 0}',
+                                        Icons.mark_email_read,
+                                        colorScheme.secondary,
+                                      ),
+                                      _buildStatItem(
+                                        '未读数量',
+                                        '${stats['unread_count'] ?? 0}',
+                                        Icons.mark_email_unread,
+                                        colorScheme.tertiary,
+                                      ),
+                                      _buildStatItem(
+                                        '阅读率',
+                                        '${(stats['read_rate'] ?? 0.0).toStringAsFixed(1)}%',
+                                        Icons.trending_up,
+                                        colorScheme.error,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          )
-                        : RefreshIndicator(
-                            onRefresh: () => _loadBroadcastMessages(
-                              resetPage: true,
-                            ),
-                            child: ListView.builder(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.all(16),
-                              itemCount: _broadcastMessages.length +
-                                  (_hasMore ? 1 : 0),
-                              itemBuilder: (context, index) {
-                                if (index >= _broadcastMessages.length) {
-                                  // 加载更多
-                                  if (!_isLoading && _hasMore) {
-                                    _currentPage++;
-                                    _loadBroadcastMessages();
-                                  }
-                                  return const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.all(16),
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  );
-                                }
-
-                                final message = _broadcastMessages[index];
-                                final stats = message['stats'] as Map<String, dynamic>? ?? {};
-                                final sender = message['sender'] as Map<String, dynamic>? ?? {};
-
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  elevation: 2,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        // 标题和发送者
-                                        Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    message['title'] ?? '无标题',
-                                                    style: theme
-                                                        .textTheme.titleLarge
-                                                        ?.copyWith(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Row(
-                                                    children: [
-                                                      Icon(
-                                                        Icons.person,
-                                                        size: 16,
-                                                        color: colorScheme
-                                                            .onSurface
-                                                            .withValues(
-                                                              alpha: 0.6,
-                                                            ),
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        sender['username'] ??
-                                                            '未知用户',
-                                                        style: theme
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.copyWith(
-                                                          color: colorScheme
-                                                              .onSurface
-                                                              .withValues(
-                                                                alpha: 0.6,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 16),
-                                                      Icon(
-                                                        Icons.access_time,
-                                                        size: 16,
-                                                        color: colorScheme
-                                                            .onSurface
-                                                            .withValues(
-                                                              alpha: 0.6,
-                                                            ),
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        _formatDate(
-                                                          message['created_at'],
-                                                        ),
-                                                        style: theme
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.copyWith(
-                                                          color: colorScheme
-                                                              .onSurface
-                                                              .withValues(
-                                                                alpha: 0.6,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 4,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: colorScheme.primary
-                                                    .withValues(alpha: 0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                              child: Text(
-                                                '系统公告',
-                                                style: theme.textTheme.bodySmall
-                                                    ?.copyWith(
-                                                  color: colorScheme.primary,
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        // 内容
-                                        Text(
-                                          message['content'] ?? '无内容',
-                                          style: theme.textTheme.bodyMedium,
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 12),
-                                        // 统计信息
-                                        Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: colorScheme.surfaceVariant
-                                                .withValues(alpha: 0.3),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceAround,
-                                            children: [
-                                              _buildStatItem(
-                                                '发送数量',
-                                                '${stats['total_count'] ?? 0}',
-                                                Icons.send,
-                                                colorScheme.primary,
-                                              ),
-                                              _buildStatItem(
-                                                '已读数量',
-                                                '${stats['read_count'] ?? 0}',
-                                                Icons.mark_email_read,
-                                                colorScheme.secondary,
-                                              ),
-                                              _buildStatItem(
-                                                '未读数量',
-                                                '${stats['unread_count'] ?? 0}',
-                                                Icons.mark_email_unread,
-                                                colorScheme.tertiary,
-                                              ),
-                                              _buildStatItem(
-                                                '阅读率',
-                                                '${(stats['read_rate'] ?? 0.0).toStringAsFixed(1)}%',
-                                                Icons.trending_up,
-                                                colorScheme.error,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
                           ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -553,4 +526,3 @@ class _MessageManagementTabContentState
     );
   }
 }
-

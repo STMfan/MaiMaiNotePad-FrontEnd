@@ -7,7 +7,6 @@ import '../../providers/theme_provider.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/app_router.dart';
 import '../../services/api_service.dart';
-import '../admin/overview_tab_content.dart';
 import '../admin/upload_management_tab_content.dart';
 import '../admin/review_tab_content.dart';
 import '../knowledge/tab_content.dart';
@@ -195,13 +194,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  // 切换到指定tab的方法
-  void _switchToTab(int index) {
-    setState(() {
-      _currentIndex = index;
-    });
-  }
-
   // 切换到上传管理tab
   void _switchToUploadManagementTab() {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -268,10 +260,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       adminPages.add(ReviewTabContent());
     }
 
-    // 添加管理员概览标签页（仅管理员可见）
-    if (userProvider.currentUser?.role == 'admin') {
-      adminPages.add(AdminOverviewTabContent());
-    }
+    // 添加管理员概览标签页（仅管理员可见）- 已移除
 
     // 添加上传管理标签页（所有登录用户可见）
     adminPages.add(UploadManagementTabContent());
@@ -478,8 +467,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                   if (_unreadMessageCount > 0)
                                     Positioned(
-                                      right: 8,
-                                      top: 8,
+                                      right: 2,
+                                      top: 2,
                                       child: Container(
                                         padding: const EdgeInsets.all(4),
                                         decoration: BoxDecoration(

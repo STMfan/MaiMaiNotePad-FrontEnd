@@ -378,7 +378,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ? null
                                   : _sendVerificationCode,
                               child: _countdown > 0
-                                  ? Text('${_countdown}秒')
+                                  ? Text('$_countdown 秒')
                                   : const Text('发送验证码'),
                             ),
                           );

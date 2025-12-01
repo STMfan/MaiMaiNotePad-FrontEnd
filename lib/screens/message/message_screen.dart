@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/user_provider.dart';
+// import 'package:provider/provider.dart';  // 未使用
+// import '../../providers/user_provider.dart';  // 未使用
 import '../../models/message.dart';
 import '../../services/api_service.dart';
 

@@ -44,6 +44,9 @@ dependencies:
   
   # Markdown支持
   flutter_markdown: ^0.6.18
+  
+  # Web支持
+  web: ^0.5.1
 
 dev_dependencies:
   flutter_test:

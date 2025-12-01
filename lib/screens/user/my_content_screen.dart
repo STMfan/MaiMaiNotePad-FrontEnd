@@ -21,7 +21,7 @@ class _MyContentScreenState extends State<MyContentScreen>
   late TabController _tabController;
   bool _isLoading = false;
   String? _error;
-  bool _waitingUser = true;
+
 
   // 筛选与分页状态
   String _nameQuery = '';
@@ -48,7 +48,6 @@ class _MyContentScreenState extends State<MyContentScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = Provider.of<UserProvider>(context, listen: false).user;
       if (user != null) {
-        _waitingUser = false;
         _loadData();
       } else {
         // 监听用户变化
@@ -69,7 +68,6 @@ class _MyContentScreenState extends State<MyContentScreen>
   void _onUserReady() {
     final user = Provider.of<UserProvider>(context, listen: false).user;
     if (user != null) {
-      _waitingUser = false;
       Provider.of<UserProvider>(context, listen: false)
           .removeListener(_onUserReady);
       _loadData();

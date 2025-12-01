@@ -221,7 +221,7 @@ class _PersonaScreenState extends State<PersonaScreen>
         mediaQuery.size.width > 800 && mediaQuery.size.width <= 1200;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text('人设卡'),
         backgroundColor: theme.colorScheme.surface,
@@ -250,7 +250,7 @@ class _PersonaScreenState extends State<PersonaScreen>
                   color: theme.colorScheme.surface,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -303,7 +303,7 @@ class _PersonaScreenState extends State<PersonaScreen>
                         // 分类筛选
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _selectedCategory,
+                            initialValue: _selectedCategory,
                             decoration: InputDecoration(
                               labelText: '分类',
                               border: OutlineInputBorder(
@@ -333,7 +333,7 @@ class _PersonaScreenState extends State<PersonaScreen>
                         // 排序选项
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _selectedSortOption,
+              initialValue: _selectedSortOption,
                             decoration: InputDecoration(
                               labelText: '排序',
                               border: OutlineInputBorder(
@@ -377,16 +377,16 @@ class _PersonaScreenState extends State<PersonaScreen>
                             Icon(
                               Icons.person,
                               size: 64,
-                              color: theme.colorScheme.onBackground.withOpacity(
-                                0.5,
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.5,
                               ),
                             ),
                             const SizedBox(height: 16),
                             Text(
                               '暂无人设卡',
                               style: theme.textTheme.headlineSmall?.copyWith(
-                                color: theme.colorScheme.onBackground
-                                    .withOpacity(0.5),
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.5),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -395,8 +395,8 @@ class _PersonaScreenState extends State<PersonaScreen>
                                   ? '没有找到匹配的人设卡'
                                   : '还没有人上传人设卡',
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onBackground
-                                    .withOpacity(0.5),
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.5),
                               ),
                             ),
                           ],
@@ -416,9 +416,9 @@ class _PersonaScreenState extends State<PersonaScreen>
       // 添加上传按钮
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToUpload,
+        tooltip: _isLoggedIn ? '上传人设卡' : '请先登录后上传人设卡',
         icon: const Icon(Icons.add),
         label: Text(_isLoggedIn ? '上传人设卡' : '登录后上传'),
-        tooltip: _isLoggedIn ? '上传人设卡' : '请先登录后上传人设卡',
       ),
     );
   }
@@ -496,10 +496,10 @@ class PersonaCard extends StatelessWidget {
   final bool isListView;
 
   const PersonaCard({
-    super.key,
     required this.persona,
     required this.onTap,
     this.isListView = false,
+    super.key,
   });
 
   @override
@@ -529,7 +529,7 @@ class PersonaCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.person, size: 16, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                  Icon(Icons.person, size: 16, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                   const SizedBox(width: 4),
                   Text(author, style: theme.textTheme.bodySmall),
                   const SizedBox(width: 16),
@@ -538,7 +538,7 @@ class PersonaCard extends StatelessWidget {
                   Text(starCount, style: theme.textTheme.bodySmall),
                   if (tags.isNotEmpty) ...[
                     const SizedBox(width: 16),
-                    Icon(Icons.tag, size: 16, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                    Icon(Icons.tag, size: 16, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -571,22 +571,22 @@ class PersonaCard extends StatelessWidget {
             Container(
               height: 120,
               width: double.infinity,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    theme.colorScheme.secondary.withOpacity(0.8),
-                    theme.colorScheme.secondary.withOpacity(0.4),
+                    theme.colorScheme.secondary.withValues(alpha: 0.8),
+                    theme.colorScheme.secondary.withValues(alpha: 0.4),
                   ],
                 ),
               ),
               child: Icon(
                 Icons.person,
                 size: 48,
-                color: theme.colorScheme.onSecondary.withOpacity(0.8),
+                color: theme.colorScheme.onSecondary.withValues(alpha: 0.8),
               ),
-              alignment: Alignment.center,
             ),
 
             // 内容区域
@@ -613,7 +613,7 @@ class PersonaCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.person, size: 14, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                      Icon(Icons.person, size: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                       const SizedBox(width: 2),
                       Text(
                         author,

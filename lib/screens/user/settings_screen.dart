@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
-import '../../services/auth_service.dart';
+
 import '../../models/user.dart';
 
 class SettingsScreen extends StatefulWidget {

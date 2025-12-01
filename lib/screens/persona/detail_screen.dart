@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/persona.dart';
 import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
-import '../../constants/app_constants.dart';
+
 import '../../utils/download_helper.dart';
 
 class PersonaDetailScreen extends StatefulWidget {
@@ -209,7 +207,6 @@ class _PersonaDetailScreenState extends State<PersonaDetailScreen> {
     });
 
     try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
       final apiService = ApiService();
 
       await apiService.deletePersona(widget.personaId);

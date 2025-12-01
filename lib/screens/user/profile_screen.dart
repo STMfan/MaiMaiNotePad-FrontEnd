@@ -52,7 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final apiService = ApiService();
       final oldUrl = await apiService.getCurrentBaseUrl();
       await apiService.updateBaseUrl(newUrl);
-      
+
       // 记录日志
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final currentUser = userProvider.user;
@@ -73,11 +73,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
-  
+
   // 记录服务器地址修改日志
   void _logServerChange(String adminName, String oldUrl, String newUrl) {
     final timestamp = DateTime.now().toIso8601String();
-    print('[服务器地址修改日志] $timestamp - 管理员: $adminName - 旧地址: $oldUrl - 新地址: $newUrl');
+    print(
+      '[服务器地址修改日志] $timestamp - 管理员: $adminName - 旧地址: $oldUrl - 新地址: $newUrl',
+    );
     // TODO: 如果需要持久化日志，可以保存到SharedPreferences或发送到后端
   }
 
@@ -103,12 +105,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showServerDialog() async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final currentUser = userProvider.user;
-    
+
     if (currentUser == null || currentUser.role != 'admin') {
       _showError('只有管理员可以修改服务器地址');
       return;
     }
-    
+
     // 第一步：显示密码确认对话框
     final passwordController = TextEditingController();
     final passwordConfirmed = await showDialog<bool>(
@@ -140,9 +142,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             onPressed: () {
               if (passwordController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请输入密码')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('请输入密码')));
                 return;
               }
               Navigator.of(context).pop(true);
@@ -152,14 +154,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
-    
+
     if (passwordConfirmed != true) return;
-    
+
     // 验证密码
     try {
       final authService = AuthService();
-      final result = await authService.login(currentUser.name, passwordController.text);
-      
+      final result = await authService.login(
+        currentUser.name,
+        passwordController.text,
+      );
+
       if (!result['success']) {
         _showError('密码验证失败: ${result['message']}');
         return;
@@ -168,7 +173,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _showError('密码验证失败: $e');
       return;
     }
-    
+
     // 第二步：显示服务器地址修改对话框
     showDialog(
       context: context,
@@ -243,7 +248,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: Theme.of(context).colorScheme.primary,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
+              child: Row(
                 children: [
                   CircleAvatar(
                     radius: 40,
@@ -297,7 +302,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 // 主题设置
                 ListTile(
-                  leading: Icon(themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode),
+                  leading: Icon(
+                    themeProvider.isDarkMode
+                        ? Icons.dark_mode
+                        : Icons.light_mode,
+                  ),
                   title: const Text('主题模式'),
                   subtitle: Text(themeProvider.isDarkMode ? '深色模式' : '亮色模式'),
                   trailing: Switch(

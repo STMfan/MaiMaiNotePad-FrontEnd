@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/knowledge.dart';
-import '../../models/persona.dart';
+
 import '../../utils/app_theme.dart';
 import '../../viewmodels/stars_viewmodel.dart';
 import '../knowledge/detail_screen.dart';

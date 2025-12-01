@@ -18,14 +18,14 @@ class _ReviewTabContentState extends State<ReviewTabContent>
   List<Persona> _pendingPersonas = [];
   bool _isLoading = false;
   String? _error;
-  
+
   // 分页状态
   int _knowledgeCurrentPage = 1;
   int _knowledgeTotal = 0;
-  int _knowledgePageSize = 20;
+  final int _knowledgePageSize = 20;
   int _personaCurrentPage = 1;
   int _personaTotal = 0;
-  int _personaPageSize = 20;
+  final int _personaPageSize = 20;
 
   @override
   void initState() {
@@ -70,13 +70,13 @@ class _ReviewTabContentState extends State<ReviewTabContent>
           if (knowledgePage != null) {
             _knowledgeCurrentPage = knowledgePage;
           }
-          
+
           _pendingPersonas = personaResponse.items;
           _personaTotal = personaResponse.total;
           if (personaPage != null) {
             _personaCurrentPage = personaPage;
           }
-          
+
           _isLoading = false;
         });
       }
@@ -97,11 +97,11 @@ class _ReviewTabContentState extends State<ReviewTabContent>
       }
     }
   }
-  
+
   void _onKnowledgePageChanged(int page) {
     _loadPendingItems(knowledgePage: page);
   }
-  
+
   void _onPersonaPageChanged(int page) {
     _loadPendingItems(personaPage: page);
   }
@@ -257,7 +257,10 @@ class _ReviewTabContentState extends State<ReviewTabContent>
           children: [
             const Text('暂无待审核的知识库'),
             if (_knowledgeTotal > 0)
-              Text('总数: $_knowledgeTotal', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(
+                '总数: $_knowledgeTotal',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
           ],
         ),
       );
@@ -307,7 +310,10 @@ class _ReviewTabContentState extends State<ReviewTabContent>
           if (_knowledgeTotal > 0)
             PaginationWidget(
               currentPage: _knowledgeCurrentPage,
-              totalPages: (_knowledgeTotal / _knowledgePageSize).ceil().clamp(1, double.infinity).toInt(),
+              totalPages: (_knowledgeTotal / _knowledgePageSize)
+                  .ceil()
+                  .clamp(1, double.infinity)
+                  .toInt(),
               total: _knowledgeTotal,
               pageSize: _knowledgePageSize,
               onPageChanged: _onKnowledgePageChanged,
@@ -345,7 +351,10 @@ class _ReviewTabContentState extends State<ReviewTabContent>
           children: [
             const Text('暂无待审核的人设卡'),
             if (_personaTotal > 0)
-              Text('总数: $_personaTotal', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(
+                '总数: $_personaTotal',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
           ],
         ),
       );
@@ -395,7 +404,10 @@ class _ReviewTabContentState extends State<ReviewTabContent>
           if (_personaTotal > 0)
             PaginationWidget(
               currentPage: _personaCurrentPage,
-              totalPages: (_personaTotal / _personaPageSize).ceil().clamp(1, double.infinity).toInt(),
+              totalPages: (_personaTotal / _personaPageSize)
+                  .ceil()
+                  .clamp(1, double.infinity)
+                  .toInt(),
               total: _personaTotal,
               pageSize: _personaPageSize,
               onPageChanged: _onPersonaPageChanged,
@@ -405,4 +417,3 @@ class _ReviewTabContentState extends State<ReviewTabContent>
     );
   }
 }
-

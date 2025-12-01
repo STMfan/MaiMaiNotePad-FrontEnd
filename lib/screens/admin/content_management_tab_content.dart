@@ -441,7 +441,7 @@ class _ContentManagementTabContentState
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _orderBy,
+                      initialValue: _orderBy,
                       decoration: const InputDecoration(
                         labelText: '排序字段',
                         border: OutlineInputBorder(),
@@ -560,7 +560,7 @@ class _ContentManagementTabContentState
                                             ),
                                             backgroundColor: _getStatusColor(
                                               status,
-                                            ).withOpacity(0.2),
+                                            ).withValues(alpha: 0.2),
                                             labelStyle: TextStyle(
                                               color: _getStatusColor(status),
                                             ),

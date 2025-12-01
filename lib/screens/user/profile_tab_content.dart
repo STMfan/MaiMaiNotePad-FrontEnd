@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:frontend_flutter/utils/app_theme.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
@@ -38,14 +38,14 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
   void _showServerDialog() async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final currentUser = userProvider.currentUser;
-    
+
     if (currentUser == null || currentUser.role != 'admin') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('只有管理员可以修改服务器地址')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('只有管理员可以修改服务器地址')));
       return;
     }
-    
+
     // 第一步：显示密码确认对话框
     final passwordController = TextEditingController();
     final passwordConfirmed = await showDialog<bool>(
@@ -77,9 +77,9 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
           ElevatedButton(
             onPressed: () {
               if (passwordController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请输入密码')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('请输入密码')));
                 return;
               }
               Navigator.of(context).pop(true);
@@ -89,14 +89,17 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
         ],
       ),
     );
-    
+
     if (passwordConfirmed != true) return;
-    
+
     // 验证密码
     try {
       final authService = AuthService();
-      final result = await authService.login(currentUser.name, passwordController.text);
-      
+      final result = await authService.login(
+        currentUser.name,
+        passwordController.text,
+      );
+
       if (!result['success']) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -107,13 +110,13 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('密码验证失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('密码验证失败: $e')));
       }
       return;
     }
-    
+
     // 第二步：显示服务器地址修改对话框
     showDialog(
       context: context,
@@ -139,15 +142,15 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
                 if (newUrl.isNotEmpty) {
                   final oldUrl = await ApiService().getCurrentBaseUrl();
                   await ApiService().updateBaseUrl(newUrl);
-                  
+
                   // 记录日志
                   _logServerChange(currentUser.name, oldUrl, newUrl);
-                  
+
                   if (mounted) {
                     Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('服务器地址已更新')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('服务器地址已更新')));
                   }
                 }
               },
@@ -158,11 +161,13 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
       },
     );
   }
-  
+
   // 记录服务器地址修改日志
   void _logServerChange(String adminName, String oldUrl, String newUrl) {
     final timestamp = DateTime.now().toIso8601String();
-    print('[服务器地址修改日志] $timestamp - 管理员: $adminName - 旧地址: $oldUrl - 新地址: $newUrl');
+    print(
+      '[服务器地址修改日志] $timestamp - 管理员: $adminName - 旧地址: $oldUrl - 新地址: $newUrl',
+    );
     // TODO: 如果需要持久化日志，可以保存到SharedPreferences或发送到后端
   }
 
@@ -171,9 +176,7 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         if (!userProvider.isLoggedIn) {
-          return const Center(
-            child: Text('请先登录'),
-          );
+          return const Center(child: Text('请先登录'));
         }
 
         return SingleChildScrollView(
@@ -195,35 +198,13 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // 头像显示
-                      Center(
-                        child: _buildAvatarWidget(userProvider.currentUser),
-                      ),
+                      // 响应式布局：移动端垂直，桌面端横向
+                      _buildResponsiveUserInfo(userProvider),
                       const SizedBox(height: 16),
-                      ListTile(
-                        leading: const Icon(Icons.person),
-                        title: Text(userProvider.currentUser?.name ?? '未知用户'),
-                        subtitle: const Text('用户名'),
-                      ),
-                      const SizedBox(height: 8),
-                      ListTile(
-                        leading: const Icon(Icons.email),
-                        title: Text(userProvider.currentUser?.email ?? '未知邮箱'),
-                        subtitle: const Text('邮箱地址'),
-                      ),
-                      if (userProvider.currentUser?.role != null) ...[
-                        const SizedBox(height: 8),
-                        ListTile(
-                          leading: const Icon(Icons.security),
-                          title: Text(_getRoleDisplayName(userProvider.currentUser!.role)),
-                          subtitle: const Text('用户角色'),
-                        ),
-                      ],
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
               Card(
                 child: Column(
                   children: [
@@ -280,7 +261,10 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.logout, color: Colors.red),
-                      title: const Text('退出登录', style: TextStyle(color: Colors.red)),
+                      title: const Text(
+                        '退出登录',
+                        style: TextStyle(color: Colors.red),
+                      ),
                       onTap: () => _showLogoutDialog(userProvider),
                     ),
                   ],
@@ -328,35 +312,62 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
   }
 
   // 显示头像（支持首字母头像）
-  Widget _buildAvatarWidget(user) {
-    final avatarUrl = user?.avatarUrl;
+  Widget _buildAvatarWidget(UserProvider userProvider, {double size = 50}) {
+    final user = userProvider.currentUser;
     final userName = user?.name ?? '?';
-    
-    if (avatarUrl != null && avatarUrl.isNotEmpty) {
-      // 有上传的头像，使用FutureBuilder异步获取完整URL
-      return FutureBuilder<String?>(
-        future: _getFullAvatarUrl(avatarUrl),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            return CircleAvatar(
-              radius: 50,
-              backgroundImage: NetworkImage(snapshot.data!),
+
+    return FutureBuilder<String?>(
+      future: _getFullAvatarUrl(user?.avatarUrl ?? ''),
+      builder: (context, snapshot) {
+        final avatarUrl = snapshot.data;
+
+        if (snapshot.hasData && avatarUrl != null && avatarUrl.isNotEmpty) {
+          // 有头像URL时，使用NetworkImage
+          return Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: size,
+              backgroundImage: NetworkImage(avatarUrl),
+              backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.1),
               onBackgroundImageError: (exception, stackTrace) {
-                // 如果网络图片加载失败，显示首字母头像
                 debugPrint('头像加载失败: $exception');
+                // 网络图片加载失败，显示首字母头像
               },
-              child: snapshot.hasError
-                  ? _buildInitialAvatar(userName, 100)
-                  : null,
-            );
-          }
-          // 加载中或失败，显示首字母头像
-          return _buildInitialAvatar(userName, 100);
-        },
-      );
-    }
-    // 没有头像，显示首字母头像
-    return _buildInitialAvatar(userName, 100);
+            ),
+          );
+        }
+
+        // 没有头像、加载失败或加载中，显示首字母头像
+        return Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: CircleAvatar(
+            radius: size,
+            backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.1),
+            child: snapshot.hasError
+                ? const Icon(Icons.error, color: Colors.white)
+                : _buildInitialAvatar(userName, size),
+          ),
+        );
+      },
+    );
   }
 
   // 生成首字母头像
@@ -373,6 +384,196 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
           color: Colors.white,
         ),
       ),
+    );
+  }
+
+  Widget _buildResponsiveUserInfo(UserProvider userProvider) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+    final isTablet = screenWidth >= 768 && screenWidth < 1024;
+
+    if (isMobile) {
+      // 移动端：垂直居中排列，更紧凑的间距
+      return Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildAvatarWidget(userProvider),
+            const SizedBox(height: 16),
+            _buildUserInfoList(userProvider),
+          ],
+        ),
+      );
+    } else if (isTablet) {
+      // 平板端：紧凑的横向布局
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildAvatarWidget(userProvider, size: 60),
+          const SizedBox(width: 24),
+          Expanded(child: _buildUserInfoList(userProvider, compact: true)),
+        ],
+      );
+    } else {
+      // 桌面端：更平衡的横向布局
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildAvatarWidget(userProvider, size: 70),
+          const SizedBox(width: 32),
+          Container(
+            constraints: const BoxConstraints(maxWidth: 350),
+            child: _buildUserInfoList(userProvider),
+          ),
+        ],
+      );
+    }
+  }
+
+  // 构建用户信息列表
+  Widget _buildUserInfoList(UserProvider userProvider, {bool compact = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 用户名信息 - 突出显示
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.person,
+                color: Theme.of(context).colorScheme.primary,
+                size: compact ? 16 : 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      userProvider.currentUser?.name ?? '未知用户',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '用户名',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        SizedBox(height: compact ? 6 : 12),
+
+        // 邮箱信息
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.email,
+                color: Theme.of(context).colorScheme.primary,
+                size: compact ? 16 : 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      userProvider.currentUser?.email ?? '未知邮箱',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '邮箱地址',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // 用户角色信息（如果存在）
+        if (userProvider.currentUser?.role != null) ...[
+          SizedBox(height: compact ? 6 : 12),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.security,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: compact ? 16 : 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _getRoleDisplayName(userProvider.currentUser!.role),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        '用户角色',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -393,9 +594,9 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
                 Navigator.of(context).pop();
                 await userProvider.logout();
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已退出登录')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('已退出登录')));
                 }
               },
               child: const Text('确定'),
