@@ -119,7 +119,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
     try {
       final apiService = ApiService();
       final response = await apiService.get(
-        '/api/admin/upload-history?page=1&limit=20',
+        '/api/me/upload-history?page=1&limit=20',
       );
       final data = response.data;
 
@@ -239,7 +239,7 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
   Future<void> _loadUploadStats() async {
     try {
       final apiService = ApiService();
-      final response = await apiService.get('/api/admin/upload-stats');
+      final response = await apiService.get('/api/me/upload-stats');
       final data = response.data;
 
       // 添加调试日志
@@ -428,7 +428,8 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
       final metadata = {
         'name': _knowledgeNameController.text.trim(),
         'description': _knowledgeDescriptionController.text.trim(),
-        'content': _knowledgeDescriptionController.text.trim(), // 存库替代 metadata 文件
+        'content': _knowledgeDescriptionController.text
+            .trim(), // 存库替代 metadata 文件
         'copyright_owner': _knowledgeCopyrightController.text.trim(),
         'tags': tags.join(','),
         'isPublic': 'false',
@@ -469,10 +470,14 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
 
       // 调用API上传知识库
       final apiService = ApiService();
-      final response = await apiService.upload('/api/knowledge/upload', formData);
+      final response = await apiService.upload(
+        '/api/knowledge/upload',
+        formData,
+      );
       final statusOk = (response.statusCode ?? 500) < 300;
       final data = response.data;
-      final success = data != null &&
+      final success =
+          data != null &&
           ((data is Map && (data['success'] == true || data['id'] != null)) ||
               data is! Map);
       if (!statusOk || !success) {
@@ -575,7 +580,8 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
       final metadata = {
         'name': _personaNameController.text.trim(),
         'description': _personaDescriptionController.text.trim(),
-        'content': _personaDescriptionController.text.trim(), // 存库替代 metadata 文件
+        'content': _personaDescriptionController.text
+            .trim(), // 存库替代 metadata 文件
         'copyright_owner': _personaAuthorController.text.trim(),
         'tags': tags.join(','),
         'isPublic': 'false',
@@ -619,7 +625,8 @@ class _UploadManagementTabContentState extends State<UploadManagementTabContent>
       final response = await apiService.upload('/api/persona/upload', formData);
       final statusOk = (response.statusCode ?? 500) < 300;
       final data = response.data;
-      final success = data != null &&
+      final success =
+          data != null &&
           ((data is Map && (data['success'] == true || data['id'] != null)) ||
               data is! Map);
       if (!statusOk || !success) {
